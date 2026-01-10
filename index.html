@@ -704,8 +704,16 @@
 
         let saveTimeout;
         let isCalculating = false;
-        let calculationCanceled = false;
         let vizUpdatePending = false;
+        
+        // Helper to yield control to browser
+        const yieldToBrowser = () => new Promise(resolve => {
+            if (window.requestIdleCallback) {
+                requestIdleCallback(resolve, { timeout: 10 });
+            } else {
+                setTimeout(resolve, 0);
+            }
+        });
 
         // --- LOCAL STORAGE LOGIC (Replaces Cloud) ---
 
@@ -1009,24 +1017,23 @@
 
         // Check if a box can be placed at position in unified space
         function canPlaceBox(x, y, z, w, h, d) {
-            // Check bounds
-            if (x < 0 || y < 0 || z < 0) return false;
-            if (x + w > totalWidth || z + d > totalDepth) return false;
+            if (x < 0 || y < 0 || z < 0 || x + w > totalWidth || z + d > totalDepth) {
+                return false;
+            }
 
-            // Check each cell the box would occupy
-            for (let ix = Math.floor(x); ix < Math.ceil(x + w); ix++) {
-                for (let iy = Math.floor(y); iy < Math.ceil(y + h); iy++) {
-                    for (let iz = Math.floor(z); iz < Math.ceil(z + d); iz++) {
-                        // Check grid bounds
+            const xEnd = Math.ceil(x + w);
+            const yEnd = Math.ceil(y + h);
+            const zEnd = Math.ceil(z + d);
+            
+            for (let ix = Math.floor(x); ix < xEnd; ix++) {
+                for (let iy = Math.floor(y); iy < yEnd; iy++) {
+                    for (let iz = Math.floor(z); iz < zEnd; iz++) {
                         if (ix >= occupied.length || iy >= occupied[0].length || iz >= occupied[0][0].length) {
                             return false;
                         }
-                        // Check if occupied
-                        if (occupied[ix][iy][iz]) return false;
-                        
-                        // Check height constraint at this Z position (redundant if init is correct but safe)
-                        const maxH = getMaxHeightAtZ(iz);
-                        if (iy >= maxH) return false;
+                        if (occupied[ix][iy][iz] || iy >= getMaxHeightAtZ(iz)) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -1034,9 +1041,13 @@
         }
 
         function occupySpace(x, y, z, w, h, d) {
-            for (let ix = Math.floor(x); ix < Math.ceil(x + w); ix++) {
-                for (let iy = Math.floor(y); iy < Math.ceil(y + h); iy++) {
-                    for (let iz = Math.floor(z); iz < Math.ceil(z + d); iz++) {
+            const xEnd = Math.ceil(x + w);
+            const yEnd = Math.ceil(y + h);
+            const zEnd = Math.ceil(z + d);
+            
+            for (let ix = Math.floor(x); ix < xEnd; ix++) {
+                for (let iy = Math.floor(y); iy < yEnd; iy++) {
+                    for (let iz = Math.floor(z); iz < zEnd; iz++) {
                         if (ix < occupied.length && iy < occupied[0].length && iz < occupied[0][0].length) {
                             occupied[ix][iy][iz] = true;
                         }
@@ -1046,26 +1057,23 @@
         }
 
         function freeSpace(x, y, z, w, h, d) {
-            for (let ix = Math.floor(x); ix < Math.ceil(x + w); ix++) {
-                for (let iy = Math.floor(y); iy < Math.ceil(y + h); iy++) {
-                    for (let iz = Math.floor(z); iz < Math.ceil(z + d); iz++) {
-                        if (ix < occupied.length && iy < occupied[0].length && iz < occupied[0][0].length) {
-                            // Don't free cells that are out of bounds (walls)
-                            // Determine valid range for this Z
-                            let validXStart, validXEnd, validH;
-                            if (iz < backDepth) {
-                                validXStart = trunkBackOffset;
-                                validXEnd = trunkBackOffset + trunkDims.backW;
-                                validH = backHeight;
-                            } else {
-                                validXStart = trunkFrontOffset;
-                                validXEnd = trunkFrontOffset + trunkDims.frontW;
-                                validH = frontHeight;
-                            }
-
-                            if (ix >= validXStart && ix < validXEnd && iy < validH) {
-                                occupied[ix][iy][iz] = false;
-                            }
+            const xStart = Math.floor(x), xEnd = Math.ceil(x + w);
+            const yStart = Math.floor(y), yEnd = Math.ceil(y + h);
+            const zStart = Math.floor(z), zEnd = Math.ceil(z + d);
+            
+            for (let ix = xStart; ix < xEnd; ix++) {
+                for (let iy = yStart; iy < yEnd; iy++) {
+                    for (let iz = zStart; iz < zEnd; iz++) {
+                        if (ix >= occupied.length || iy >= occupied[0].length || iz >= occupied[0][0].length) continue;
+                        
+                        // Only free cells within valid trunk bounds
+                        const isBack = iz < backDepth;
+                        const validXStart = isBack ? trunkBackOffset : trunkFrontOffset;
+                        const validXEnd = isBack ? (trunkBackOffset + trunkDims.backW) : (trunkFrontOffset + trunkDims.frontW);
+                        const validH = isBack ? backHeight : frontHeight;
+                        
+                        if (ix >= validXStart && ix < validXEnd && iy < validH) {
+                            occupied[ix][iy][iz] = false;
                         }
                     }
                 }
@@ -1115,110 +1123,76 @@
             return result ? 1 : 0;
         }
 
-        function calculateOptimal() {
-            // Prevent overlapping calculations
-            if (isCalculating) {
-                return;
-            }
+        async function calculateOptimal() {
+            if (isCalculating) return;
             
             isCalculating = true;
-            calculationCanceled = false;
-            
-            // Show loading state
             const calcBtn = document.querySelector('.calc-btn');
-            const originalText = calcBtn.textContent;
             calcBtn.textContent = 'Calculating...';
             calcBtn.disabled = true;
             
-            // Use setTimeout to allow UI to update and prevent blocking
-            setTimeout(() => {
-                calculateOptimalAsync();
-            }, 10);
-        }
-        
-        async function calculateOptimalAsync() {
-            const calcBtn = document.querySelector('.calc-btn');
-            
             try {
+                // Allow UI to update before starting heavy computation
+                await yieldToBrowser();
+                
                 trunkDims = getDims();
                 boxTypes = getBoxTypesFromUI();
                 const rotate = document.getElementById('allowRotation').checked;
 
-                // Calculate L-shaped volume
-                const backVol = trunkDims.backW * trunkDims.backH * trunkDims.backD;
-                const frontVol = trunkDims.frontW * trunkDims.frontH * trunkDims.frontD;
-                totalTrunkVolume = backVol + frontVol;
+                totalTrunkVolume = (trunkDims.backW * trunkDims.backH * trunkDims.backD) + 
+                                  (trunkDims.frontW * trunkDims.frontH * trunkDims.frontD);
 
                 initOccupationGrid();
                 placedBoxes = [];
 
-                // Sort by volume descending (pack larger boxes first)
+                // Pack boxes, largest first
                 const sortedTypes = [...boxTypes].sort((a, b) => (b.w * b.h * b.d) - (a.w * a.h * a.d));
 
                 for (const boxType of sortedTypes) {
-                    if (calculationCanceled) break;
-                    
-                    let keepPlacing = true;
                     let boxCount = 0;
-                    const maxBoxes = 1000; // Safety limit
+                    const YIELD_INTERVAL = 50; // Yield every 50 boxes
                     
-                    while (keepPlacing && boxCount < maxBoxes) {
-                        if (calculationCanceled) break;
-                        
-                        // Yield to browser periodically to prevent freezing (every 50 boxes)
-                        if (boxCount % 50 === 0 && boxCount > 0) {
-                            // Yield control to browser
-                            await new Promise(resolve => {
-                                if (window.requestIdleCallback) {
-                                    requestIdleCallback(resolve, { timeout: 10 });
-                                } else {
-                                    setTimeout(resolve, 0);
-                                }
-                            });
+                    while (boxCount < 1000) { // Safety limit
+                        // Yield periodically to keep UI responsive
+                        if (boxCount > 0 && boxCount % YIELD_INTERVAL === 0) {
+                            await yieldToBrowser();
                         }
                         
                         const result = tryPlaceOneBox(boxType.w, boxType.h, boxType.d, rotate);
-                        if (result) {
-                            const { pos, orient } = result;
-                            occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
-                            placedBoxes.push({
-                                boxId: boxType.id,
-                                x: pos.x, y: pos.y, z: pos.z,
-                                w: orient.w, h: orient.h, d: orient.d,
-                                color: boxType.color,
-                                name: boxType.name
-                            });
-                            boxCount++;
-                        } else {
-                            keepPlacing = false;
-                        }
+                        if (!result) break;
+                        
+                        const { pos, orient } = result;
+                        occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
+                        placedBoxes.push({
+                            boxId: boxType.id,
+                            x: pos.x, y: pos.y, z: pos.z,
+                            w: orient.w, h: orient.h, d: orient.d,
+                            color: boxType.color,
+                            name: boxType.name
+                        });
+                        boxCount++;
                     }
                 }
 
-                if (!calculationCanceled) {
-                    updateUI();
-                    updateLegend(boxTypes);
-                    
-                    // Defer 3D rendering to prevent blocking
-                    if (!vizUpdatePending) {
-                        vizUpdatePending = true;
-                        requestAnimationFrame(() => {
-                            updateViz();
-                            vizUpdatePending = false;
-                        });
-                    }
-                    
-                    // Defer localStorage save
-                    setTimeout(() => saveSettings(), 100);
+                updateUI();
+                updateLegend(boxTypes);
+                
+                // Defer 3D rendering
+                if (!vizUpdatePending) {
+                    vizUpdatePending = true;
+                    requestAnimationFrame(() => {
+                        updateViz();
+                        vizUpdatePending = false;
+                    });
                 }
+                
+                setTimeout(() => saveSettings(), 100);
             } catch (e) {
                 console.error('Calculation error:', e);
             } finally {
                 isCalculating = false;
-                if (calcBtn) {
-                    calcBtn.textContent = 'Calculate Optimal Fit';
-                    calcBtn.disabled = false;
-                }
+                calcBtn.textContent = 'Calculate Optimal Fit';
+                calcBtn.disabled = false;
             }
         }
 
