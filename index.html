@@ -262,8 +262,14 @@
             touch-action: manipulation;
         }
 
-        .calc-btn:active {
+        .calc-btn:active:not(:disabled) {
             transform: scale(0.98);
+        }
+
+        .calc-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            background: linear-gradient(135deg, #6a9a94 0%, #5a8077 100%);
         }
 
         .results-box {
@@ -697,6 +703,9 @@
         let trunkFrontOffset = 0;
 
         let saveTimeout;
+        let isCalculating = false;
+        let calculationCanceled = false;
+        let vizUpdatePending = false;
 
         // --- LOCAL STORAGE LOGIC (Replaces Cloud) ---
 
@@ -745,31 +754,39 @@
         function saveSettings() {
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
-                const boxData = {};
-                for (let i = 1; i <= 3; i++) {
-                    boxData[i] = {
-                        w: parseFloat(document.getElementById(`box${i}W`).value) || 0,
-                        h: parseFloat(document.getElementById(`box${i}H`).value) || 0,
-                        d: parseFloat(document.getElementById(`box${i}D`).value) || 0,
-                        name: document.getElementById(`box${i}Name`).value,
-                        enabled: document.getElementById(`box${i}Enabled`).checked
-                    };
-                }
-
-                const data = {
-                    trunk: getDims(),
-                    boxes: boxData,
-                    options: {
-                        rotate: document.getElementById('allowRotation').checked,
-                        wireframe: document.getElementById('showWireframe').checked,
-                        unit: document.getElementById('unit').value
-                    }
-                };
-                
                 try {
-                     localStorage.setItem('trunkSettings', JSON.stringify(data));
-                } catch(e) { console.error("Save error", e); }
-            }, 1000); 
+                    const boxData = {};
+                    for (let i = 1; i <= 3; i++) {
+                        boxData[i] = {
+                            w: parseFloat(document.getElementById(`box${i}W`).value) || 0,
+                            h: parseFloat(document.getElementById(`box${i}H`).value) || 0,
+                            d: parseFloat(document.getElementById(`box${i}D`).value) || 0,
+                            name: document.getElementById(`box${i}Name`).value,
+                            enabled: document.getElementById(`box${i}Enabled`).checked
+                        };
+                    }
+
+                    const data = {
+                        trunk: getDims(),
+                        boxes: boxData,
+                        options: {
+                            rotate: document.getElementById('allowRotation').checked,
+                            wireframe: document.getElementById('showWireframe').checked,
+                            unit: document.getElementById('unit').value
+                        }
+                    };
+                    
+                    // Use try-catch and check quota
+                    localStorage.setItem('trunkSettings', JSON.stringify(data));
+                } catch(e) { 
+                    // Handle quota exceeded or other errors silently
+                    if (e.name === 'QuotaExceededError') {
+                        console.warn("Storage quota exceeded, settings not saved");
+                    } else {
+                        console.error("Save error", e); 
+                    }
+                }
+            }, 1500); // Increased delay to reduce frequency on mobile
         }
 
         // --- Window/UI Exports ---
@@ -1099,47 +1116,110 @@
         }
 
         function calculateOptimal() {
-            trunkDims = getDims();
-            boxTypes = getBoxTypesFromUI();
-            const rotate = document.getElementById('allowRotation').checked;
+            // Prevent overlapping calculations
+            if (isCalculating) {
+                return;
+            }
+            
+            isCalculating = true;
+            calculationCanceled = false;
+            
+            // Show loading state
+            const calcBtn = document.querySelector('.calc-btn');
+            const originalText = calcBtn.textContent;
+            calcBtn.textContent = 'Calculating...';
+            calcBtn.disabled = true;
+            
+            // Use setTimeout to allow UI to update and prevent blocking
+            setTimeout(() => {
+                calculateOptimalAsync();
+            }, 10);
+        }
+        
+        async function calculateOptimalAsync() {
+            const calcBtn = document.querySelector('.calc-btn');
+            
+            try {
+                trunkDims = getDims();
+                boxTypes = getBoxTypesFromUI();
+                const rotate = document.getElementById('allowRotation').checked;
 
-            // Calculate L-shaped volume
-            const backVol = trunkDims.backW * trunkDims.backH * trunkDims.backD;
-            const frontVol = trunkDims.frontW * trunkDims.frontH * trunkDims.frontD;
-            totalTrunkVolume = backVol + frontVol;
+                // Calculate L-shaped volume
+                const backVol = trunkDims.backW * trunkDims.backH * trunkDims.backD;
+                const frontVol = trunkDims.frontW * trunkDims.frontH * trunkDims.frontD;
+                totalTrunkVolume = backVol + frontVol;
 
-            initOccupationGrid();
-            placedBoxes = [];
+                initOccupationGrid();
+                placedBoxes = [];
 
-            // Sort by volume descending (pack larger boxes first)
-            const sortedTypes = [...boxTypes].sort((a, b) => (b.w * b.h * b.d) - (a.w * a.h * a.d));
+                // Sort by volume descending (pack larger boxes first)
+                const sortedTypes = [...boxTypes].sort((a, b) => (b.w * b.h * b.d) - (a.w * a.h * a.d));
 
-            for (const boxType of sortedTypes) {
-                let keepPlacing = true;
-                while (keepPlacing) {
-                    const result = tryPlaceOneBox(boxType.w, boxType.h, boxType.d, rotate);
-                    if (result) {
-                        const { pos, orient } = result;
-                        occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
-                        placedBoxes.push({
-                            boxId: boxType.id,
-                            x: pos.x, y: pos.y, z: pos.z,
-                            w: orient.w, h: orient.h, d: orient.d,
-                            color: boxType.color,
-                            name: boxType.name
-                        });
-                    } else {
-                        keepPlacing = false;
+                for (const boxType of sortedTypes) {
+                    if (calculationCanceled) break;
+                    
+                    let keepPlacing = true;
+                    let boxCount = 0;
+                    const maxBoxes = 1000; // Safety limit
+                    
+                    while (keepPlacing && boxCount < maxBoxes) {
+                        if (calculationCanceled) break;
+                        
+                        // Yield to browser periodically to prevent freezing (every 50 boxes)
+                        if (boxCount % 50 === 0 && boxCount > 0) {
+                            // Yield control to browser
+                            await new Promise(resolve => {
+                                if (window.requestIdleCallback) {
+                                    requestIdleCallback(resolve, { timeout: 10 });
+                                } else {
+                                    setTimeout(resolve, 0);
+                                }
+                            });
+                        }
+                        
+                        const result = tryPlaceOneBox(boxType.w, boxType.h, boxType.d, rotate);
+                        if (result) {
+                            const { pos, orient } = result;
+                            occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
+                            placedBoxes.push({
+                                boxId: boxType.id,
+                                x: pos.x, y: pos.y, z: pos.z,
+                                w: orient.w, h: orient.h, d: orient.d,
+                                color: boxType.color,
+                                name: boxType.name
+                            });
+                            boxCount++;
+                        } else {
+                            keepPlacing = false;
+                        }
                     }
                 }
+
+                if (!calculationCanceled) {
+                    updateUI();
+                    updateLegend(boxTypes);
+                    
+                    // Defer 3D rendering to prevent blocking
+                    if (!vizUpdatePending) {
+                        vizUpdatePending = true;
+                        requestAnimationFrame(() => {
+                            updateViz();
+                            vizUpdatePending = false;
+                        });
+                    }
+                    
+                    // Defer localStorage save
+                    setTimeout(() => saveSettings(), 100);
+                }
+            } catch (e) {
+                console.error('Calculation error:', e);
+            } finally {
+                isCalculating = false;
+                if (calcBtn) {
+                    calcBtn.textContent = 'Calculate Optimal Fit';
+                    calcBtn.disabled = false;
+                }
             }
-
-            updateUI();
-            updateLegend(boxTypes);
-            updateViz();
-
-            // Trigger local save
-            saveSettings();
         }
 
         function getBoxCounts() {
@@ -1206,6 +1286,8 @@
         }
 
         function addBox(boxId) {
+            if (isCalculating) return; // Don't allow during calculation
+            
             const bt = boxTypes.find(b => b.id === boxId);
             if (!bt) return;
 
@@ -1223,18 +1305,20 @@
                     name: bt.name
                 });
                 updateUI();
-                updateViz();
+                requestAnimationFrame(() => updateViz());
             }
         }
 
         function removeBox(boxId) {
+            if (isCalculating) return; // Don't allow during calculation
+            
             for (let i = placedBoxes.length - 1; i >= 0; i--) {
                 if (placedBoxes[i].boxId === boxId) {
                     const box = placedBoxes[i];
                     freeSpace(box.x, box.y, box.z, box.w, box.h, box.d);
                     placedBoxes.splice(i, 1);
                     updateUI();
-                    updateViz();
+                    requestAnimationFrame(() => updateViz());
                     return;
                 }
             }
@@ -1262,11 +1346,15 @@
         }
 
         function updateViz() {
+            // Skip if already updating or calculating
+            if (vizUpdatePending || isCalculating) return;
+            
             clearGroups();
             const wire = document.getElementById('showWireframe').checked;
             const dims = trunkDims;
 
             const maxDim = Math.max(totalWidth, backHeight, totalDepth);
+            if (maxDim === 0) return; // Safety check
             const sc = 120 / maxDim;
 
             // Center offset for the entire trunk in the scene
@@ -1331,8 +1419,11 @@
 
         window.addEventListener('load', init);
 
-        // Debounce for input
+        // Debounce for input - longer delay on mobile
         let debounceTimer = null;
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const debounceDelay = isMobile ? 1000 : 500; // Longer delay on mobile
+        
         function debounceCalculate() {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
@@ -1341,12 +1432,13 @@
                 if (allDims.every(d => d >= 1 && d <= 10000)) {
                     calculateOptimal();
                 }
-            }, 500);
+            }, debounceDelay);
         }
 
+        // Only use input event with debounce - remove duplicate change listener
         document.querySelectorAll('.zone-card input, .box-row input[type="number"]').forEach(el => {
             el.addEventListener('input', debounceCalculate);
-            el.addEventListener('change', calculateOptimal);
+            // Remove change listener to prevent double calculation
         });
 
         document.getElementById('allowRotation').addEventListener('change', calculateOptimal);
