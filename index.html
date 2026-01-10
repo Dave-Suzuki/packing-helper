@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Car Trunk Box Packing Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 0.75rem 1rem;
+            background: rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .tab-nav {
+            display: none;
+            background: rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: sticky;
+            top: 48px;
+            z-index: 99;
+        }
+
+        .tab-nav button {
+            flex: 1;
+            padding: 0.75rem;
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-nav button.active {
+            color: #4ecdc4;
+            border-bottom-color: #4ecdc4;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .controls-panel {
+            width: 420px;
+            min-width: 420px;
+            padding: 1rem;
+            background: rgba(255,255,255,0.03);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 1rem;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-header h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #aaa;
+        }
+
+        .trunk-zones {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .zone-card {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 0.6rem;
+        }
+
+        .zone-card.back { border-top: 2px solid #a78bfa; }
+        .zone-card.front { border-top: 2px solid #4ecdc4; }
+
+        .zone-title {
+            font-weight: 600;
+            font-size: 0.8rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .zone-title.back { color: #a78bfa; }
+        .zone-title.front { color: #4ecdc4; }
+
+        .dim-row {
+            display: flex;
+            gap: 0.35rem;
+        }
+
+        .dim-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dim-group label {
+            font-size: 0.6rem;
+            color: #666;
+            margin-bottom: 0.1rem;
+        }
+
+        .dim-group input {
+            width: 100%;
+            padding: 0.5rem 0.25rem;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 0.95rem;
+            text-align: center;
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+        }
+
+        .dim-group input:focus {
+            outline: none;
+            border-color: #4ecdc4;
+        }
+
+        .box-types-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .box-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 0.6rem;
+        }
+
+        .box-row.type-1 { border-left: 3px solid #ff6b6b; }
+        .box-row.type-2 { border-left: 3px solid #ffd93d; }
+        .box-row.type-3 { border-left: 3px solid #6bcb77; }
+
+        .box-check input {
+            accent-color: #4ecdc4;
+            width: 18px;
+            height: 18px;
+        }
+
+        .box-name {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 0.85rem;
+            width: 60px;
+            min-width: 60px;
+        }
+
+        .box-name:focus {
+            outline: none;
+            border-bottom: 1px solid #4ecdc4;
+        }
+
+        .box-dims {
+            display: flex;
+            gap: 0.3rem;
+            flex: 1;
+        }
+
+        .box-dims .dim-group {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .box-dims .dim-group input {
+            padding: 0.4rem 0.2rem;
+            font-size: 0.9rem;
+        }
+
+        .options-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .opt {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 0.4rem 0.6rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+        }
+
+        .opt input { 
+            accent-color: #4ecdc4;
+            width: 16px;
+            height: 16px;
+        }
+
+        .unit-sel {
+            padding: 0.4rem 0.6rem;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 0.8rem;
+        }
+
+        .calc-btn {
+            width: 100%;
+            padding: 0.85rem;
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 0.75rem;
+            touch-action: manipulation;
+        }
+
+        .calc-btn:active {
+            transform: scale(0.98);
+        }
+
+        .results-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 0.5rem;
+        }
+
+        .results-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #888;
+        }
+
+        .total-count {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            display: flex;
+            gap: 0.3rem;
+        }
+
+        .stat-label { color: #888; }
+        .stat-val { color: #4ecdc4; font-weight: 500; }
+
+        .qty-section {
+            background: rgba(78, 205, 196, 0.08);
+            border: 1px solid rgba(78, 205, 196, 0.25);
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+
+        .qty-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .qty-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #4ecdc4;
+        }
+
+        .reset-btn {
+            padding: 0.3rem 0.6rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            color: #888;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .qty-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .qty-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            flex-wrap: wrap;
+        }
+
+        .qty-row .info {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.85rem;
+            min-width: 70px;
+        }
+
+        .qty-row .vol-info {
+            font-size: 0.65rem;
+            color: #666;
+            min-width: 55px;
+        }
+
+        .qty-row .zones {
+            font-size: 0.7rem;
+            color: #888;
+            flex: 1;
+            min-width: 60px;
+        }
+
+        .qty-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .qty-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+
+        .qty-btn:active:not(:disabled) {
+            background: rgba(78, 205, 196, 0.3);
+            border-color: #4ecdc4;
+        }
+
+        .qty-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .qty-input {
+            width: 50px;
+            padding: 0.4rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .remaining-row {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+        }
+
+        .remaining-row .label { color: #888; }
+        .remaining-row .value { color: #ffd93d; font-weight: 600; }
+
+        .canvas-wrap {
+            flex: 1;
+            min-width: 280px;
+            position: relative;
+            background: #1a1a2e;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 0.5rem;
+            left: 0.5rem;
+            background: rgba(0,0,0,0.7);
+            padding: 0.4rem 0.7rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            color: #888;
+        }
+
+        .legend {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(0,0,0,0.7);
+            padding: 0.5rem 0.7rem;
+            border-radius: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-bottom: 0.25rem;
+            font-size: 0.75rem;
+        }
+
+        .legend-item:last-child { margin-bottom: 0; }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        @media (max-width: 768px) {
+            header h1 { font-size: 1rem; }
+            .tab-nav { display: flex; }
+            .main-content { flex-direction: column; }
+            .controls-panel { 
+                width: 100%; 
+                min-width: unset; 
+                padding: 0.75rem; 
+                border-right: none;
+                overflow-y: visible;
+                max-height: none;
+            }
+            .controls-panel.hidden { display: none; }
+            .canvas-wrap { height: 50vh; min-height: 300px; }
+            .canvas-wrap.hidden { display: none; }
+            .canvas-wrap.fullscreen { height: calc(100vh - 96px); }
+            .trunk-zones { flex-direction: column; }
+            .zone-card { padding: 0.75rem; }
+            .dim-row { gap: 0.5rem; }
+            .dim-group input { padding: 0.6rem 0.25rem; font-size: 1rem; }
+            .box-row { flex-wrap: wrap; padding: 0.75rem; }
+            .box-name { font-size: 0.9rem; width: 70px; }
+            .box-dims { width: 100%; margin-top: 0.5rem; }
+            .box-dims .dim-group input { padding: 0.5rem 0.25rem; font-size: 0.95rem; }
+            .options-row { justify-content: space-between; }
+            .calc-btn { padding: 1rem; font-size: 1rem; }
+            .qty-row { padding: 0.6rem; }
+            .qty-btn { width: 44px; height: 44px; font-size: 1.4rem; }
+            .qty-input { width: 55px; font-size: 1.1rem; padding: 0.5rem; }
+        }
+
+        @media (max-width: 380px) {
+            .controls-panel { padding: 0.5rem; }
+            .box-name { width: 55px; font-size: 0.8rem; }
+            .qty-row .info { min-width: 60px; font-size: 0.8rem; }
+            .qty-row .vol-info { display: none; }
+        }
+
+        @media (max-height: 500px) and (orientation: landscape) {
+            .main-content { flex-direction: row; }
+            .controls-panel { width: 50%; max-height: calc(100vh - 48px); overflow-y: auto; }
+            .canvas-wrap { width: 50%; height: calc(100vh - 48px); }
+            .tab-nav { display: none; }
+            .controls-panel.hidden, .canvas-wrap.hidden { display: block; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>🚗 Car Trunk Packing Calculator (Portable)</h1>
+        </header>
+
+        <nav class="tab-nav">
+            <button class="active" onclick="showTab('controls')">Settings</button>
+            <button onclick="showTab('3d')">3D View</button>
+        </nav>
+
+        <div class="main-content">
+            <div class="controls-panel" id="controlsPanel">
+                <div class="section">
+                    <div class="section-header">
+                        <span>📐</span>
+                        <h3>Trunk Space (Centered Connection)</h3>
+                    </div>
+                    <div class="trunk-zones">
+                        <div class="zone-card back">
+                            <div class="zone-title back">◀ Back (taller)</div>
+                            <div class="dim-row">
+                                <div class="dim-group">
+                                    <label>W</label>
+                                    <input type="number" id="backW" value="40" min="1" inputmode="decimal">
+                                </div>
+                                <div class="dim-group">
+                                    <label>H</label>
+                                    <input type="number" id="backH" value="20" min="1" inputmode="decimal">
+                                </div>
+                                <div class="dim-group">
+                                    <label>D</label>
+                                    <input type="number" id="backD" value="24" min="1" inputmode="decimal">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="zone-card front">
+                            <div class="zone-title front">Front (shorter) ▶</div>
+                            <div class="dim-row">
+                                <div class="dim-group">
+                                    <label>W</label>
+                                    <input type="number" id="frontW" value="40" min="1" inputmode="decimal">
+                                </div>
+                                <div class="dim-group">
+                                    <label>H</label>
+                                    <input type="number" id="frontH" value="14" min="1" inputmode="decimal">
+                                </div>
+                                <div class="dim-group">
+                                    <label>D</label>
+                                    <input type="number" id="frontD" value="20" min="1" inputmode="decimal">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <span>📦</span>
+                        <h3>Box Types</h3>
+                    </div>
+                    <div class="box-types-list">
+                        <div class="box-row type-1">
+                            <div class="box-check"><input type="checkbox" id="box1Enabled" checked></div>
+                            <input type="text" class="box-name" id="box1Name" value="Small">
+                            <div class="box-dims">
+                                <div class="dim-group"><label>W</label><input type="number" id="box1W" value="8" min="1" inputmode="decimal"></div>
+                                <div class="dim-group"><label>H</label><input type="number" id="box1H" value="6" min="1" inputmode="decimal"></div>
+                                <div class="dim-group"><label>D</label><input type="number" id="box1D" value="6" min="1" inputmode="decimal"></div>
+                            </div>
+                        </div>
+                        <div class="box-row type-2">
+                            <div class="box-check"><input type="checkbox" id="box2Enabled" checked></div>
+                            <input type="text" class="box-name" id="box2Name" value="Medium">
+                            <div class="box-dims">
+                                <div class="dim-group"><label>W</label><input type="number" id="box2W" value="12" min="1" inputmode="decimal"></div>
+                                <div class="dim-group"><label>H</label><input type="number" id="box2H" value="8" min="1" inputmode="decimal"></div>
+                                <div class="dim-group"><label>D</label><input type="number" id="box2D" value="10" min="1" inputmode="decimal"></div>
+                            </div>
+                        </div>
+                        <div class="box-row type-3">
+                            <div class="box-check"><input type="checkbox" id="box3Enabled" checked></div>
+                            <input type="text" class="box-name" id="box3Name" value="Large">
+                            <div class="box-dims">
+                                <div class="dim-group"><label>W</label><input type="number" id="box3W" value="16" min="1" inputmode="decimal"></div>
+                                <div class="dim-group"><label>H</label><input type="number" id="box3H" value="12" min="1" inputmode="decimal"></div>
+                                <div class="dim-group"><label>D</label><input type="number" id="box3D" value="12" min="1" inputmode="decimal"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="options-row">
+                    <label class="opt"><input type="checkbox" id="allowRotation" checked> Rotate</label>
+                    <label class="opt"><input type="checkbox" id="showWireframe" checked> Wireframe</label>
+                    <select class="unit-sel" id="unit">
+                        <option value="in" selected>inches</option>
+                        <option value="cm">cm</option>
+                        <option value="mm">mm</option>
+                    </select>
+                </div>
+
+                <button class="calc-btn" onclick="calculateOptimal()">Calculate Optimal Fit</button>
+
+                <div class="results-box">
+                    <div class="results-header">
+                        <span class="results-title">Results</span>
+                        <span class="total-count" id="totalBoxes">0 boxes</span>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat">
+                            <span class="stat-label">Used:</span>
+                            <span class="stat-val" id="spaceUsed">0%</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Volume:</span>
+                            <span class="stat-val" id="trunkVolume">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="qty-section">
+                    <div class="qty-header">
+                        <span class="qty-title">Adjust Quantities</span>
+                        <button class="reset-btn" onclick="resetToOptimal()">Reset</button>
+                    </div>
+                    <div class="qty-list" id="qtyList"></div>
+                    <div class="remaining-row">
+                        <span class="label">Remaining:</span>
+                        <span class="value" id="remainingVolume">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="canvas-wrap" id="canvasWrap">
+                <canvas id="canvas3d"></canvas>
+                <div class="hint">👆 Drag to rotate • Pinch to zoom</div>
+                <div class="legend" id="legend"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // --- Globals ---
+        let scene, camera, renderer, trunkGroup, boxesGroup;
+        let isDragging = false, prevMouse = { x: 0, y: 0 };
+        let rotX = 0.4, rotY = -0.5, zoom = 1;
+
+        const colors = [0xff6b6b, 0xffd93d, 0x6bcb77];
+        const colorNames = ['#ff6b6b', '#ffd93d', '#6bcb77'];
+
+        let trunkDims = {};
+        let boxTypes = [];
+        let placedBoxes = [];
+        let totalTrunkVolume = 0;
+
+        // Unified space: one 3D grid for the trunk
+        let occupied = null;  // 3D boolean array
+        let totalWidth = 0;
+        let totalDepth = 0;
+        let backDepth = 0;
+        let backHeight = 0;
+        let frontHeight = 0;
+        
+        // Centering offsets
+        let trunkBackOffset = 0;
+        let trunkFrontOffset = 0;
+
+        let saveTimeout;
+
+        // --- LOCAL STORAGE LOGIC (Replaces Cloud) ---
+
+        function loadSettings() {
+            try {
+                const saved = localStorage.getItem('trunkSettings');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    applySettings(data);
+                }
+            } catch (e) {
+                console.error("Load settings error", e);
+            }
+        }
+
+        function applySettings(data) {
+            if (data.trunk) {
+                document.getElementById('backW').value = data.trunk.backW;
+                document.getElementById('backH').value = data.trunk.backH;
+                document.getElementById('backD').value = data.trunk.backD;
+                document.getElementById('frontW').value = data.trunk.frontW;
+                document.getElementById('frontH').value = data.trunk.frontH;
+                document.getElementById('frontD').value = data.trunk.frontD;
+            }
+            if (data.boxes) {
+                for (const boxId in data.boxes) {
+                    const b = data.boxes[boxId];
+                    if (document.getElementById(`box${boxId}W`)) {
+                        document.getElementById(`box${boxId}W`).value = b.w;
+                        document.getElementById(`box${boxId}H`).value = b.h;
+                        document.getElementById(`box${boxId}D`).value = b.d;
+                        document.getElementById(`box${boxId}Name`).value = b.name;
+                        document.getElementById(`box${boxId}Enabled`).checked = b.enabled;
+                    }
+                }
+            }
+            if (data.options) {
+                document.getElementById('allowRotation').checked = data.options.rotate;
+                document.getElementById('showWireframe').checked = data.options.wireframe;
+                document.getElementById('unit').value = data.options.unit || 'in';
+            }
+            // Recalculate after applying settings
+            setTimeout(calculateOptimal, 100);
+        }
+
+        function saveSettings() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const boxData = {};
+                for (let i = 1; i <= 3; i++) {
+                    boxData[i] = {
+                        w: parseFloat(document.getElementById(`box${i}W`).value) || 0,
+                        h: parseFloat(document.getElementById(`box${i}H`).value) || 0,
+                        d: parseFloat(document.getElementById(`box${i}D`).value) || 0,
+                        name: document.getElementById(`box${i}Name`).value,
+                        enabled: document.getElementById(`box${i}Enabled`).checked
+                    };
+                }
+
+                const data = {
+                    trunk: getDims(),
+                    boxes: boxData,
+                    options: {
+                        rotate: document.getElementById('allowRotation').checked,
+                        wireframe: document.getElementById('showWireframe').checked,
+                        unit: document.getElementById('unit').value
+                    }
+                };
+                
+                try {
+                     localStorage.setItem('trunkSettings', JSON.stringify(data));
+                } catch(e) { console.error("Save error", e); }
+            }, 1000); 
+        }
+
+        // --- Window/UI Exports ---
+        
+        function showTab(tab) {
+            const controls = document.getElementById('controlsPanel');
+            const canvas = document.getElementById('canvasWrap');
+            const buttons = document.querySelectorAll('.tab-nav button');
+            buttons.forEach(b => b.classList.remove('active'));
+            if (tab === 'controls') {
+                controls.classList.remove('hidden');
+                canvas.classList.add('hidden');
+                canvas.classList.remove('fullscreen');
+                buttons[0].classList.add('active');
+            } else {
+                controls.classList.add('hidden');
+                canvas.classList.remove('hidden');
+                canvas.classList.add('fullscreen');
+                buttons[1].classList.add('active');
+                onResize();
+            }
+        };
+
+        // --- 3D & Logic ---
+
+        function init() {
+            const canvas = document.getElementById('canvas3d');
+            const wrap = canvas.parentElement;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 2000);
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dl = new THREE.DirectionalLight(0xffffff, 0.8);
+            dl.position.set(100, 200, 150);
+            scene.add(dl);
+
+            const grid = new THREE.GridHelper(250, 25, 0x444444, 0x333333);
+            grid.position.y = -0.1;
+            scene.add(grid);
+
+            trunkGroup = new THREE.Group();
+            boxesGroup = new THREE.Group();
+            scene.add(trunkGroup);
+            scene.add(boxesGroup);
+
+            canvas.addEventListener('mousedown', e => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; });
+            canvas.addEventListener('mousemove', onMove);
+            canvas.addEventListener('mouseup', () => isDragging = false);
+            canvas.addEventListener('mouseleave', () => isDragging = false);
+            canvas.addEventListener('wheel', onWheel, { passive: false });
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchend', onTouchEnd);
+
+            window.addEventListener('resize', onResize);
+            window.addEventListener('orientationchange', () => setTimeout(onResize, 100));
+
+            // Load settings first, then calculate
+            loadSettings();
+            calculateOptimal();
+            animate();
+        }
+
+        function onMove(e) {
+            if (!isDragging) return;
+            rotY += (e.clientX - prevMouse.x) * 0.01;
+            rotX += (e.clientY - prevMouse.y) * 0.01;
+            rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, rotX));
+            prevMouse = { x: e.clientX, y: e.clientY };
+        }
+
+        function onWheel(e) {
+            e.preventDefault();
+            zoom *= e.deltaY > 0 ? 1.1 : 0.9;
+            zoom = Math.max(0.3, Math.min(3, zoom));
+        }
+
+        let lastDist = 0;
+        function onTouchStart(e) {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                isDragging = false;
+                lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            }
+        }
+
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (e.touches.length === 1 && isDragging) {
+                rotY += (e.touches[0].clientX - prevMouse.x) * 0.008;
+                rotX += (e.touches[0].clientY - prevMouse.y) * 0.008;
+                rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, rotX));
+                prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                if (lastDist > 0) {
+                    zoom *= lastDist / dist;
+                    zoom = Math.max(0.3, Math.min(3, zoom));
+                }
+                lastDist = dist;
+            }
+        }
+
+        function onTouchEnd() {
+            isDragging = false;
+            lastDist = 0;
+        }
+
+        function onResize() {
+            const wrap = document.getElementById('canvasWrap');
+            if (wrap.offsetWidth === 0 || wrap.offsetHeight === 0) return;
+            camera.aspect = wrap.offsetWidth / wrap.offsetHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(wrap.offsetWidth, wrap.offsetHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const r = 280 * zoom;
+            camera.position.x = r * Math.sin(rotY) * Math.cos(rotX);
+            camera.position.y = r * Math.sin(rotX) + 50;
+            camera.position.z = r * Math.cos(rotY) * Math.cos(rotX);
+            camera.lookAt(0, 20, 0);
+            renderer.render(scene, camera);
+        }
+
+        function getOrients(w, h, d) {
+            const s = new Set();
+            [[w,h,d],[w,d,h],[h,w,d],[h,d,w],[d,w,h],[d,h,w]].forEach(p => s.add(p.join(',')));
+            return Array.from(s).map(x => { const [a,b,c] = x.split(',').map(Number); return {w:a,h:b,d:c}; });
+        }
+
+        function getBoxTypesFromUI() {
+            const boxes = [];
+            for (let i = 1; i <= 3; i++) {
+                if (document.getElementById(`box${i}Enabled`).checked) {
+                    boxes.push({
+                        id: i,
+                        name: document.getElementById(`box${i}Name`).value,
+                        w: parseFloat(document.getElementById(`box${i}W`).value) || 0,
+                        h: parseFloat(document.getElementById(`box${i}H`).value) || 0,
+                        d: parseFloat(document.getElementById(`box${i}D`).value) || 0,
+                        color: colors[i-1],
+                        colorName: colorNames[i-1]
+                    });
+                }
+            }
+            return boxes;
+        }
+
+        function getDims() {
+            return {
+                backW: parseFloat(document.getElementById('backW').value) || 0,
+                backH: parseFloat(document.getElementById('backH').value) || 0,
+                backD: parseFloat(document.getElementById('backD').value) || 0,
+                frontW: parseFloat(document.getElementById('frontW').value) || 0,
+                frontH: parseFloat(document.getElementById('frontH').value) || 0,
+                frontD: parseFloat(document.getElementById('frontD').value) || 0
+            };
+        }
+
+        // Get the maximum allowed height at a given Z position
+        function getMaxHeightAtZ(z) {
+            if (z < backDepth) {
+                return backHeight;
+            } else {
+                return frontHeight;
+            }
+        }
+
+        // Initialize unified occupation grid with CENTERED logic
+        function initOccupationGrid() {
+            const dims = trunkDims;
+            totalWidth = Math.max(dims.backW, dims.frontW);
+            backDepth = dims.backD;
+            totalDepth = dims.backD + dims.frontD;
+            backHeight = dims.backH;
+            frontHeight = dims.frontH;
+
+            // Calculate offsets to center the sections
+            trunkBackOffset = Math.floor((totalWidth - dims.backW) / 2);
+            trunkFrontOffset = Math.floor((totalWidth - dims.frontW) / 2);
+
+            // Create unified grid
+            occupied = new Array(Math.ceil(totalWidth)).fill(null).map(() => 
+                new Array(Math.ceil(Math.max(backHeight, frontHeight))).fill(null).map(() => 
+                    new Array(Math.ceil(totalDepth)).fill(false)
+                )
+            );
+
+            // Mark out-of-bounds areas as occupied (Center aligned)
+            for (let x = 0; x < Math.ceil(totalWidth); x++) {
+                for (let y = 0; y < Math.ceil(Math.max(backHeight, frontHeight)); y++) {
+                    for (let z = 0; z < Math.ceil(totalDepth); z++) {
+                        // Back zone
+                        if (z < backDepth) {
+                            // Block if left of start OR right of end OR too high
+                            if (x < trunkBackOffset || x >= trunkBackOffset + dims.backW || y >= dims.backH) {
+                                occupied[x][y][z] = true;
+                            }
+                        }
+                        // Front zone
+                        else {
+                            if (x < trunkFrontOffset || x >= trunkFrontOffset + dims.frontW || y >= dims.frontH) {
+                                occupied[x][y][z] = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check if a box can be placed at position in unified space
+        function canPlaceBox(x, y, z, w, h, d) {
+            // Check bounds
+            if (x < 0 || y < 0 || z < 0) return false;
+            if (x + w > totalWidth || z + d > totalDepth) return false;
+
+            // Check each cell the box would occupy
+            for (let ix = Math.floor(x); ix < Math.ceil(x + w); ix++) {
+                for (let iy = Math.floor(y); iy < Math.ceil(y + h); iy++) {
+                    for (let iz = Math.floor(z); iz < Math.ceil(z + d); iz++) {
+                        // Check grid bounds
+                        if (ix >= occupied.length || iy >= occupied[0].length || iz >= occupied[0][0].length) {
+                            return false;
+                        }
+                        // Check if occupied
+                        if (occupied[ix][iy][iz]) return false;
+                        
+                        // Check height constraint at this Z position (redundant if init is correct but safe)
+                        const maxH = getMaxHeightAtZ(iz);
+                        if (iy >= maxH) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function occupySpace(x, y, z, w, h, d) {
+            for (let ix = Math.floor(x); ix < Math.ceil(x + w); ix++) {
+                for (let iy = Math.floor(y); iy < Math.ceil(y + h); iy++) {
+                    for (let iz = Math.floor(z); iz < Math.ceil(z + d); iz++) {
+                        if (ix < occupied.length && iy < occupied[0].length && iz < occupied[0][0].length) {
+                            occupied[ix][iy][iz] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        function freeSpace(x, y, z, w, h, d) {
+            for (let ix = Math.floor(x); ix < Math.ceil(x + w); ix++) {
+                for (let iy = Math.floor(y); iy < Math.ceil(y + h); iy++) {
+                    for (let iz = Math.floor(z); iz < Math.ceil(z + d); iz++) {
+                        if (ix < occupied.length && iy < occupied[0].length && iz < occupied[0][0].length) {
+                            // Don't free cells that are out of bounds (walls)
+                            // Determine valid range for this Z
+                            let validXStart, validXEnd, validH;
+                            if (iz < backDepth) {
+                                validXStart = trunkBackOffset;
+                                validXEnd = trunkBackOffset + trunkDims.backW;
+                                validH = backHeight;
+                            } else {
+                                validXStart = trunkFrontOffset;
+                                validXEnd = trunkFrontOffset + trunkDims.frontW;
+                                validH = frontHeight;
+                            }
+
+                            if (ix >= validXStart && ix < validXEnd && iy < validH) {
+                                occupied[ix][iy][iz] = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Try to place a box with any valid orientation, prioritizing tight packing
+        function tryPlaceOneBox(boxW, boxH, boxD, rotate) {
+            const orientations = rotate ? getOrients(boxW, boxH, boxD) : [{w: boxW, h: boxH, d: boxD}];
+            
+            let bestPos = null;
+            let bestOrient = null;
+            let bestScore = Infinity;
+
+            for (const o of orientations) {
+                // Quick bounds check
+                if (o.w > totalWidth || o.d > totalDepth) continue;
+                if (o.h > backHeight && o.h > frontHeight) continue;
+
+                // Scan positions: bottom-up (y), front-to-back (z), left-to-right (x)
+                for (let y = 0; y + o.h <= Math.max(backHeight, frontHeight); y++) {
+                    for (let z = 0; z + o.d <= totalDepth; z++) {
+                        for (let x = 0; x + o.w <= totalWidth; x++) {
+                            if (canPlaceBox(x, y, z, o.w, o.h, o.d)) {
+                                // Score: prioritize bottom (y), then front (z), then left (x)
+                                const score = y * 100000 + z * 1000 + x;
+                                if (score < bestScore) {
+                                    bestScore = score;
+                                    bestPos = { x, y, z };
+                                    bestOrient = o;
+                                }
+                                // Found a spot at this y,z - no need to check more x
+                                break;
+                            }
+                        }
+                    }
+                    // If we found something at this y level, might be good enough
+                    if (bestPos && bestScore < (y + 1) * 100000) break;
+                }
+            }
+
+            return bestPos && bestOrient ? { pos: bestPos, orient: bestOrient } : null;
+        }
+
+        function countCanFit(boxType, rotate) {
+            const result = tryPlaceOneBox(boxType.w, boxType.h, boxType.d, rotate);
+            return result ? 1 : 0;
+        }
+
+        function calculateOptimal() {
+            trunkDims = getDims();
+            boxTypes = getBoxTypesFromUI();
+            const rotate = document.getElementById('allowRotation').checked;
+
+            // Calculate L-shaped volume
+            const backVol = trunkDims.backW * trunkDims.backH * trunkDims.backD;
+            const frontVol = trunkDims.frontW * trunkDims.frontH * trunkDims.frontD;
+            totalTrunkVolume = backVol + frontVol;
+
+            initOccupationGrid();
+            placedBoxes = [];
+
+            // Sort by volume descending (pack larger boxes first)
+            const sortedTypes = [...boxTypes].sort((a, b) => (b.w * b.h * b.d) - (a.w * a.h * a.d));
+
+            for (const boxType of sortedTypes) {
+                let keepPlacing = true;
+                while (keepPlacing) {
+                    const result = tryPlaceOneBox(boxType.w, boxType.h, boxType.d, rotate);
+                    if (result) {
+                        const { pos, orient } = result;
+                        occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
+                        placedBoxes.push({
+                            boxId: boxType.id,
+                            x: pos.x, y: pos.y, z: pos.z,
+                            w: orient.w, h: orient.h, d: orient.d,
+                            color: boxType.color,
+                            name: boxType.name
+                        });
+                    } else {
+                        keepPlacing = false;
+                    }
+                }
+            }
+
+            updateUI();
+            updateLegend(boxTypes);
+            updateViz();
+
+            // Trigger local save
+            saveSettings();
+        }
+
+        function getBoxCounts() {
+            const counts = {};
+            for (const bt of boxTypes) {
+                counts[bt.id] = { total: 0 };
+            }
+            for (const box of placedBoxes) {
+                if (counts[box.boxId]) {
+                    counts[box.boxId].total++;
+                }
+            }
+            return counts;
+        }
+
+        function getUsedVolume() {
+            let vol = 0;
+            for (const box of placedBoxes) {
+                vol += box.w * box.h * box.d;
+            }
+            return vol;
+        }
+
+        function updateUI() {
+            const unit = document.getElementById('unit').value;
+            const counts = getBoxCounts();
+            const usedVol = getUsedVolume();
+            const rotate = document.getElementById('allowRotation').checked;
+
+            let totalBoxCount = placedBoxes.length;
+            const pct = totalTrunkVolume > 0 ? (usedVol / totalTrunkVolume * 100).toFixed(1) : 0;
+
+            document.getElementById('totalBoxes').textContent = totalBoxCount + ' boxes';
+            document.getElementById('spaceUsed').textContent = pct + '%';
+            document.getElementById('trunkVolume').textContent = totalTrunkVolume.toLocaleString() + ' ' + unit + '³';
+
+            let html = '';
+            for (const bt of boxTypes) {
+                const c = counts[bt.id] || { total: 0 };
+                const vol = bt.w * bt.h * bt.d;
+                const canAdd = countCanFit(bt, rotate) > 0;
+                const canRemove = c.total > 0;
+
+                html += `
+                    <div class="qty-row">
+                        <div class="info">
+                            <span class="dot" style="background:${bt.colorName};"></span>
+                            <span>${bt.name}</span>
+                        </div>
+                        <div class="vol-info">${vol.toLocaleString()}</div>
+                        <div class="zones">count: ${c.total}</div>
+                        <div class="qty-controls">
+                            <button class="qty-btn" onclick="removeBox(${bt.id})" ${!canRemove?'disabled':''}>−</button>
+                            <span class="qty-input">${c.total}</span>
+                            <button class="qty-btn" onclick="addBox(${bt.id})" ${!canAdd?'disabled':''}>+</button>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById('qtyList').innerHTML = html;
+
+            const remaining = totalTrunkVolume - usedVol;
+            document.getElementById('remainingVolume').textContent = remaining.toLocaleString() + ' ' + unit + '³';
+        }
+
+        function addBox(boxId) {
+            const bt = boxTypes.find(b => b.id === boxId);
+            if (!bt) return;
+
+            const rotate = document.getElementById('allowRotation').checked;
+            const result = tryPlaceOneBox(bt.w, bt.h, bt.d, rotate);
+
+            if (result) {
+                const { pos, orient } = result;
+                occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
+                placedBoxes.push({
+                    boxId: bt.id,
+                    x: pos.x, y: pos.y, z: pos.z,
+                    w: orient.w, h: orient.h, d: orient.d,
+                    color: bt.color,
+                    name: bt.name
+                });
+                updateUI();
+                updateViz();
+            }
+        }
+
+        function removeBox(boxId) {
+            for (let i = placedBoxes.length - 1; i >= 0; i--) {
+                if (placedBoxes[i].boxId === boxId) {
+                    const box = placedBoxes[i];
+                    freeSpace(box.x, box.y, box.z, box.w, box.h, box.d);
+                    placedBoxes.splice(i, 1);
+                    updateUI();
+                    updateViz();
+                    return;
+                }
+            }
+        }
+
+        function resetToOptimal() {
+            calculateOptimal();
+        }
+
+        function updateLegend(boxes) {
+            if (!boxes) boxes = boxTypes;
+            let html = `
+                <div class="legend-item"><div class="legend-color" style="background:rgba(167,139,250,0.3);border:2px solid #a78bfa;"></div><span>Back (tall)</span></div>
+                <div class="legend-item"><div class="legend-color" style="background:rgba(78,205,196,0.3);border:2px solid #4ecdc4;"></div><span>Front (short)</span></div>
+            `;
+            for (const b of boxes) {
+                html += `<div class="legend-item"><div class="legend-color" style="background:${b.colorName};"></div><span>${b.name}</span></div>`;
+            }
+            document.getElementById('legend').innerHTML = html;
+        }
+
+        function clearGroups() {
+            while (trunkGroup.children.length) trunkGroup.remove(trunkGroup.children[0]);
+            while (boxesGroup.children.length) boxesGroup.remove(boxesGroup.children[0]);
+        }
+
+        function updateViz() {
+            clearGroups();
+            const wire = document.getElementById('showWireframe').checked;
+            const dims = trunkDims;
+
+            const maxDim = Math.max(totalWidth, backHeight, totalDepth);
+            const sc = 120 / maxDim;
+
+            // Center offset for the entire trunk in the scene
+            const centerX = -totalWidth * sc / 2;
+            const centerZ = -totalDepth * sc / 2;
+
+            // Draw Centered trunk outline
+            if (wire) {
+                // Back zone (taller)
+                const sbW = dims.backW * sc, sbH = dims.backH * sc, sbD = dims.backD * sc;
+                const bgeo = new THREE.BoxGeometry(sbW, sbH, sbD);
+                const bedge = new THREE.LineSegments(new THREE.EdgesGeometry(bgeo), new THREE.LineBasicMaterial({ color: 0xa78bfa }));
+                
+                // Position: Centered via offset
+                bedge.position.set(centerX + (trunkBackOffset * sc) + sbW/2, sbH/2, centerZ + sbD/2);
+                trunkGroup.add(bedge);
+                const bfill = new THREE.Mesh(bgeo, new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.06, side: THREE.BackSide }));
+                bfill.position.copy(bedge.position);
+                trunkGroup.add(bfill);
+
+                // Front zone (shorter)
+                const sfW = dims.frontW * sc, sfH = dims.frontH * sc, sfD = dims.frontD * sc;
+                const fgeo = new THREE.BoxGeometry(sfW, sfH, sfD);
+                const fedge = new THREE.LineSegments(new THREE.EdgesGeometry(fgeo), new THREE.LineBasicMaterial({ color: 0x4ecdc4 }));
+                
+                // Position: Centered via offset
+                fedge.position.set(centerX + (trunkFrontOffset * sc) + sfW/2, sfH/2, centerZ + sbD + sfD/2);
+                trunkGroup.add(fedge);
+                const ffill = new THREE.Mesh(fgeo, new THREE.MeshBasicMaterial({ color: 0x4ecdc4, transparent: true, opacity: 0.06, side: THREE.BackSide }));
+                ffill.position.copy(fedge.position);
+                trunkGroup.add(ffill);
+            }
+
+            // Draw all placed boxes
+            for (const box of placedBoxes) {
+                const sw = box.w * sc * 0.95;
+                const sh = box.h * sc * 0.95;
+                const sd = box.d * sc * 0.95;
+
+                const geo = new THREE.BoxGeometry(sw, sh, sd);
+                const mat = new THREE.MeshPhongMaterial({ color: box.color, transparent: true, opacity: 0.85 });
+                const mesh = new THREE.Mesh(geo, mat);
+
+                // Position in unified space
+                // box.x is relative to totalWidth=0. 
+                // centerX corresponds to totalWidth=0.
+                const px = centerX + (box.x + box.w/2) * sc;
+                const py = (box.y + box.h/2) * sc;
+                const pz = centerZ + (box.z + box.d/2) * sc;
+
+                mesh.position.set(px, py, pz);
+                boxesGroup.add(mesh);
+
+                const edge = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(geo),
+                    new THREE.LineBasicMaterial({ color: 0xffffff })
+                );
+                edge.position.copy(mesh.position);
+                boxesGroup.add(edge);
+            }
+        }
+
+        window.addEventListener('load', init);
+
+        // Debounce for input
+        let debounceTimer = null;
+        function debounceCalculate() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const dims = getDims();
+                const allDims = [dims.backW, dims.backH, dims.backD, dims.frontW, dims.frontH, dims.frontD];
+                if (allDims.every(d => d >= 1 && d <= 10000)) {
+                    calculateOptimal();
+                }
+            }, 500);
+        }
+
+        document.querySelectorAll('.zone-card input, .box-row input[type="number"]').forEach(el => {
+            el.addEventListener('input', debounceCalculate);
+            el.addEventListener('change', calculateOptimal);
+        });
+
+        document.getElementById('allowRotation').addEventListener('change', calculateOptimal);
+
+        document.querySelectorAll('.box-row input[type="checkbox"]').forEach(el => {
+            el.addEventListener('change', calculateOptimal);
+        });
+
+        document.getElementById('showWireframe').addEventListener('change', updateViz);
+
+        document.getElementById('unit').addEventListener('change', function() {
+            const unit = this.value;
+            let presets;
+            if (unit === 'in') {
+                presets = { backW: 40, backH: 20, backD: 24, frontW: 40, frontH: 14, frontD: 20, box1W: 8, box1H: 6, box1D: 6, box2W: 12, box2H: 8, box2D: 10, box3W: 16, box3H: 12, box3D: 12 };
+            } else if (unit === 'cm') {
+                presets = { backW: 100, backH: 50, backD: 60, frontW: 100, frontH: 35, frontD: 50, box1W: 20, box1H: 15, box1D: 15, box2W: 30, box2H: 20, box2D: 25, box3W: 40, box3H: 30, box3D: 30 };
+            } else if (unit === 'mm') {
+                presets = { backW: 1000, backH: 500, backD: 600, frontW: 1000, frontH: 350, frontD: 500, box1W: 200, box1H: 150, box1D: 150, box2W: 300, box2H: 200, box2D: 250, box3W: 400, box3H: 300, box3D: 300 };
+            }
+            if (presets && confirm(`Update to typical ${unit} values?`)) {
+                Object.keys(presets).forEach(k => { document.getElementById(k).value = presets[k]; });
+            }
+            calculateOptimal();
+        });
+    </script>
+</body>
+</html>
