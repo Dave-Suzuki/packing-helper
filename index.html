@@ -448,6 +448,9 @@
             height: 100%;
             display: block;
             touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .hint {
@@ -814,7 +817,14 @@
                 canvas.classList.remove('hidden');
                 canvas.classList.add('fullscreen');
                 buttons[1].classList.add('active');
-                onResize();
+                // Ensure canvas is visible and properly sized on mobile
+                setTimeout(() => {
+                    onResize();
+                    // Force a render when switching to 3D view
+                    if (renderer && scene && camera) {
+                        renderer.render(scene, camera);
+                    }
+                }, 100);
             }
         };
 
@@ -822,14 +832,32 @@
 
         function init() {
             const canvas = document.getElementById('canvas3d');
+            if (!canvas) {
+                console.error('Canvas element not found');
+                return;
+            }
+            
             const wrap = canvas.parentElement;
+            if (!wrap) {
+                console.error('Canvas wrapper not found');
+                return;
+            }
 
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x1a1a2e);
 
-            camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 2000);
-            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-            renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+            // Ensure we have valid dimensions
+            const width = wrap.clientWidth || wrap.offsetWidth || 300;
+            const height = wrap.clientHeight || wrap.offsetHeight || 300;
+            
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+            renderer = new THREE.WebGLRenderer({ 
+                canvas, 
+                antialias: true,
+                alpha: false,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(width, height);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
             scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -860,6 +888,11 @@
 
             // Load settings first, then calculate
             loadSettings();
+            
+            // Initial render
+            renderer.render(scene, camera);
+            
+            // Start calculation and animation
             calculateOptimal();
             animate();
         }
@@ -880,16 +913,26 @@
 
         let lastDist = 0;
         function onTouchStart(e) {
+            // Only handle if canvas is visible
+            const canvas = document.getElementById('canvas3d');
+            if (!canvas || canvas.offsetParent === null) return;
+            
             if (e.touches.length === 1) {
                 isDragging = true;
                 prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                e.preventDefault(); // Prevent scrolling
             } else if (e.touches.length === 2) {
                 isDragging = false;
                 lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                e.preventDefault(); // Prevent pinch zoom
             }
         }
 
         function onTouchMove(e) {
+            // Only handle if canvas is visible
+            const canvas = document.getElementById('canvas3d');
+            if (!canvas || canvas.offsetParent === null) return;
+            
             e.preventDefault();
             if (e.touches.length === 1 && isDragging) {
                 rotY += (e.touches[0].clientX - prevMouse.x) * 0.008;
@@ -913,10 +956,17 @@
 
         function onResize() {
             const wrap = document.getElementById('canvasWrap');
+            if (!wrap || !camera || !renderer) return;
             if (wrap.offsetWidth === 0 || wrap.offsetHeight === 0) return;
+            
             camera.aspect = wrap.offsetWidth / wrap.offsetHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(wrap.offsetWidth, wrap.offsetHeight);
+            
+            // Force a render after resize
+            if (scene) {
+                renderer.render(scene, camera);
+            }
         }
 
         function animate() {
@@ -1177,14 +1227,14 @@
                 updateUI();
                 updateLegend(boxTypes);
                 
-                // Defer 3D rendering
-                if (!vizUpdatePending) {
-                    vizUpdatePending = true;
-                    requestAnimationFrame(() => {
-                        updateViz();
-                        vizUpdatePending = false;
-                    });
-                }
+                // Defer 3D rendering - ensure it happens
+                requestAnimationFrame(() => {
+                    updateViz();
+                    // Force a render after update
+                    if (renderer && scene && camera) {
+                        renderer.render(scene, camera);
+                    }
+                });
                 
                 setTimeout(() => saveSettings(), 100);
             } catch (e) {
@@ -1320,15 +1370,18 @@
         }
 
         function updateViz() {
-            // Skip if already updating or calculating
-            if (vizUpdatePending || isCalculating) return;
+            // Skip if calculating (but allow if pending - it will be cleared)
+            if (isCalculating) return;
+            
+            // Clear the pending flag if it was set
+            vizUpdatePending = false;
             
             clearGroups();
             const wire = document.getElementById('showWireframe').checked;
             const dims = trunkDims;
 
             const maxDim = Math.max(totalWidth, backHeight, totalDepth);
-            if (maxDim === 0) return; // Safety check
+            if (maxDim === 0 || !scene || !renderer) return; // Safety checks
             const sc = 120 / maxDim;
 
             // Center offset for the entire trunk in the scene
@@ -1388,6 +1441,11 @@
                 );
                 edge.position.copy(mesh.position);
                 boxesGroup.add(edge);
+            }
+            
+            // Force a render after updating visualization
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
             }
         }
 
