@@ -217,11 +217,29 @@
             background: rgba(255,255,255,0.05);
             border-radius: 8px;
             padding: 0.6rem;
+            position: relative;
         }
 
-        .box-row.type-1 { border-left: 3px solid #ff6b6b; }
-        .box-row.type-2 { border-left: 3px solid #ffd93d; }
-        .box-row.type-3 { border-left: 3px solid #6bcb77; }
+        .remove-box-btn {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            background: rgba(255,100,100,0.2);
+            border: 1px solid rgba(255,100,100,0.4);
+            border-radius: 4px;
+            color: #ff6b6b;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .remove-box-btn:hover {
+            background: rgba(255,100,100,0.3);
+        }
 
         .box-check input {
             accent-color: #4ecdc4;
@@ -607,35 +625,8 @@
                         <span>📦</span>
                         <h3>Box Types</h3>
                     </div>
-                    <div class="box-types-list">
-                        <div class="box-row type-1">
-                            <div class="box-check"><input type="checkbox" id="box1Enabled" checked></div>
-                            <input type="text" class="box-name" id="box1Name" value="Small">
-                            <div class="box-dims">
-                                <div class="dim-group"><label>W</label><input type="number" id="box1W" value="8" min="1" inputmode="decimal"></div>
-                                <div class="dim-group"><label>H</label><input type="number" id="box1H" value="6" min="1" inputmode="decimal"></div>
-                                <div class="dim-group"><label>D</label><input type="number" id="box1D" value="6" min="1" inputmode="decimal"></div>
-                            </div>
-                        </div>
-                        <div class="box-row type-2">
-                            <div class="box-check"><input type="checkbox" id="box2Enabled" checked></div>
-                            <input type="text" class="box-name" id="box2Name" value="Medium">
-                            <div class="box-dims">
-                                <div class="dim-group"><label>W</label><input type="number" id="box2W" value="12" min="1" inputmode="decimal"></div>
-                                <div class="dim-group"><label>H</label><input type="number" id="box2H" value="8" min="1" inputmode="decimal"></div>
-                                <div class="dim-group"><label>D</label><input type="number" id="box2D" value="10" min="1" inputmode="decimal"></div>
-                            </div>
-                        </div>
-                        <div class="box-row type-3">
-                            <div class="box-check"><input type="checkbox" id="box3Enabled" checked></div>
-                            <input type="text" class="box-name" id="box3Name" value="Large">
-                            <div class="box-dims">
-                                <div class="dim-group"><label>W</label><input type="number" id="box3W" value="16" min="1" inputmode="decimal"></div>
-                                <div class="dim-group"><label>H</label><input type="number" id="box3H" value="12" min="1" inputmode="decimal"></div>
-                                <div class="dim-group"><label>D</label><input type="number" id="box3D" value="12" min="1" inputmode="decimal"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="box-types-list"></div>
+                    <button class="add-space-btn" id="addBoxBtn" onclick="addBoxType()">+ Add Box Type</button>
                 </div>
 
                 <div class="options-row">
@@ -695,15 +686,17 @@
         let isDragging = false, prevMouse = { x: 0, y: 0 };
         let rotX = 0.4, rotY = -0.5, zoom = 1;
 
-        const colors = [0xff6b6b, 0xffd93d, 0x6bcb77];
-        const colorNames = ['#ff6b6b', '#ffd93d', '#6bcb77'];
+        const boxColors = [0xff6b6b, 0xffd93d, 0x6bcb77, 0x4ecdc4, 0xa78bfa, 0xff9ff3, 0xfeca57, 0x48dbfb, 0xff6348, 0x1dd1a1];
+        const boxColorNames = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4ecdc4', '#a78bfa', '#ff9ff3', '#feca57', '#48dbfb', '#ff6348', '#1dd1a1'];
         const spaceColors = [0xa78bfa, 0x4ecdc4, 0xffd93d, 0xff6b6b];
         const spaceColorNames = ['#a78bfa', '#4ecdc4', '#ffd93d', '#ff6b6b'];
 
         let trunkSpaces = [];  // Array of trunk spaces
-        let boxTypes = [];
+        let boxTypeConfigs = [];  // Box type configurations
+        let boxTypes = [];  // Enabled box types for calculation
         let placedBoxes = [];
         let totalTrunkVolume = 0;
+        let nextBoxId = 0;
 
         // Unified space: one 3D grid for the trunk
         let occupied = null;  // 3D boolean array
@@ -815,6 +808,86 @@
             });
         }
 
+        // --- BOX TYPE MANAGEMENT ---
+
+        function initBoxTypes() {
+            // Start with 3 default box types
+            boxTypeConfigs = [
+                { id: 0, name: 'Small', w: 8, h: 6, d: 6, enabled: true },
+                { id: 1, name: 'Medium', w: 12, h: 8, d: 10, enabled: true },
+                { id: 2, name: 'Large', w: 16, h: 12, d: 12, enabled: true }
+            ];
+            nextBoxId = 3;
+            renderBoxTypes();
+        }
+
+        function addBoxType() {
+            if (boxTypeConfigs.length >= 10) return;  // Limit to 10 box types
+
+            boxTypeConfigs.push({
+                id: nextBoxId++,
+                name: `Box ${boxTypeConfigs.length + 1}`,
+                w: 10,
+                h: 10,
+                d: 10,
+                enabled: true
+            });
+            renderBoxTypes();
+            saveSettings();
+            calculateOptimal();
+        }
+
+        function removeBoxType(id) {
+            if (boxTypeConfigs.length <= 1) return;  // Keep at least 1 box type
+
+            boxTypeConfigs = boxTypeConfigs.filter(b => b.id !== id);
+            renderBoxTypes();
+            saveSettings();
+            calculateOptimal();
+        }
+
+        function updateBoxType(id, field, value) {
+            const box = boxTypeConfigs.find(b => b.id === id);
+            if (box) {
+                if (field === 'enabled') {
+                    box[field] = value;
+                } else if (field === 'name') {
+                    box[field] = value;
+                } else {
+                    box[field] = parseFloat(value) || 0;
+                }
+                saveSettings();
+            }
+        }
+
+        function renderBoxTypes() {
+            const container = document.querySelector('.box-types-list');
+
+            container.innerHTML = boxTypeConfigs.map((box, index) => `
+                <div class="box-row" style="border-left: 3px solid ${boxColorNames[index % boxColorNames.length]};">
+                    <div class="box-check"><input type="checkbox" id="box${box.id}Enabled" ${box.enabled ? 'checked' : ''} onchange="updateBoxType(${box.id}, 'enabled', this.checked); calculateOptimal();"></div>
+                    <input type="text" class="box-name" id="box${box.id}Name" value="${box.name}" onchange="updateBoxType(${box.id}, 'name', this.value)">
+                    <div class="box-dims">
+                        <div class="dim-group"><label>W</label><input type="number" id="box${box.id}W" value="${box.w}" min="1" inputmode="decimal" onchange="updateBoxType(${box.id}, 'w', this.value)"></div>
+                        <div class="dim-group"><label>H</label><input type="number" id="box${box.id}H" value="${box.h}" min="1" inputmode="decimal" onchange="updateBoxType(${box.id}, 'h', this.value)"></div>
+                        <div class="dim-group"><label>D</label><input type="number" id="box${box.id}D" value="${box.d}" min="1" inputmode="decimal" onchange="updateBoxType(${box.id}, 'd', this.value)"></div>
+                    </div>
+                    ${boxTypeConfigs.length > 1 ? `<button class="remove-box-btn" onclick="removeBoxType(${box.id})">×</button>` : ''}
+                </div>
+            `).join('');
+
+            // Update add button state
+            const addBtn = document.getElementById('addBoxBtn');
+            if (addBtn) {
+                addBtn.disabled = boxTypeConfigs.length >= 10;
+            }
+
+            // Re-attach debounced listeners to new inputs
+            document.querySelectorAll('.box-row input[type="number"]').forEach(el => {
+                el.addEventListener('input', debounceCalculate);
+            });
+        }
+
         // --- LOCAL STORAGE LOGIC (Replaces Cloud) ---
 
         function loadSettings() {
@@ -843,17 +916,26 @@
                 }
                 renderTrunkSpaces();
             }
-            if (data.boxes) {
+            if (data.boxTypes && data.boxTypes.length > 0) {
+                boxTypeConfigs = data.boxTypes;
+                nextBoxId = Math.max(...boxTypeConfigs.map(b => b.id)) + 1;
+                renderBoxTypes();
+            } else if (data.boxes) {
+                // Legacy support - convert old format to new
+                boxTypeConfigs = [];
                 for (const boxId in data.boxes) {
                     const b = data.boxes[boxId];
-                    if (document.getElementById(`box${boxId}W`)) {
-                        document.getElementById(`box${boxId}W`).value = b.w;
-                        document.getElementById(`box${boxId}H`).value = b.h;
-                        document.getElementById(`box${boxId}D`).value = b.d;
-                        document.getElementById(`box${boxId}Name`).value = b.name;
-                        document.getElementById(`box${boxId}Enabled`).checked = b.enabled;
-                    }
+                    boxTypeConfigs.push({
+                        id: parseInt(boxId),
+                        name: b.name,
+                        w: b.w,
+                        h: b.h,
+                        d: b.d,
+                        enabled: b.enabled
+                    });
                 }
+                nextBoxId = boxTypeConfigs.length;
+                renderBoxTypes();
             }
             if (data.options) {
                 document.getElementById('allowRotation').checked = data.options.rotate;
@@ -868,17 +950,6 @@
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
                 try {
-                    const boxData = {};
-                    for (let i = 1; i <= 3; i++) {
-                        boxData[i] = {
-                            w: parseFloat(document.getElementById(`box${i}W`).value) || 0,
-                            h: parseFloat(document.getElementById(`box${i}H`).value) || 0,
-                            d: parseFloat(document.getElementById(`box${i}D`).value) || 0,
-                            name: document.getElementById(`box${i}Name`).value,
-                            enabled: document.getElementById(`box${i}Enabled`).checked
-                        };
-                    }
-
                     const data = {
                         trunkSpaces: trunkSpaces.map(s => ({
                             id: s.id,
@@ -887,7 +958,14 @@
                             h: parseFloat(document.getElementById(`space${s.id}H`)?.value) || s.h,
                             d: parseFloat(document.getElementById(`space${s.id}D`)?.value) || s.d
                         })),
-                        boxes: boxData,
+                        boxTypes: boxTypeConfigs.map(b => ({
+                            id: b.id,
+                            name: b.name,
+                            w: b.w,
+                            h: b.h,
+                            d: b.d,
+                            enabled: b.enabled
+                        })),
                         options: {
                             rotate: document.getElementById('allowRotation').checked,
                             wireframe: document.getElementById('showWireframe').checked,
@@ -994,10 +1072,11 @@
             window.addEventListener('resize', onResize);
             window.addEventListener('orientationchange', () => setTimeout(onResize, 100));
 
-            // Initialize trunk spaces first
+            // Initialize trunk spaces and box types first
             initTrunkSpaces();
+            initBoxTypes();
 
-            // Load settings (may override trunk spaces)
+            // Load settings (may override trunk spaces and box types)
             loadSettings();
 
             // Initial render
@@ -1098,19 +1177,19 @@
 
         function getBoxTypesFromUI() {
             const boxes = [];
-            for (let i = 1; i <= 3; i++) {
-                if (document.getElementById(`box${i}Enabled`).checked) {
+            boxTypeConfigs.forEach((box, index) => {
+                if (box.enabled) {
                     boxes.push({
-                        id: i,
-                        name: document.getElementById(`box${i}Name`).value,
-                        w: parseFloat(document.getElementById(`box${i}W`).value) || 0,
-                        h: parseFloat(document.getElementById(`box${i}H`).value) || 0,
-                        d: parseFloat(document.getElementById(`box${i}D`).value) || 0,
-                        color: colors[i-1],
-                        colorName: colorNames[i-1]
+                        id: box.id,
+                        name: box.name,
+                        w: box.w,
+                        h: box.h,
+                        d: box.d,
+                        color: boxColors[index % boxColors.length],
+                        colorName: boxColorNames[index % boxColors.length]
                     });
                 }
-            }
+            });
             return boxes;
         }
 
@@ -1592,25 +1671,13 @@
         function debounceCalculate() {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-                const dims = getDims();
-                const allDims = [dims.backW, dims.backH, dims.backD, dims.frontW, dims.frontH, dims.frontD];
-                if (allDims.every(d => d >= 1 && d <= 10000)) {
-                    calculateOptimal();
-                }
+                calculateOptimal();
             }, debounceDelay);
         }
 
-        // Only use input event with debounce - remove duplicate change listener
-        document.querySelectorAll('.box-row input[type="number"]').forEach(el => {
-            el.addEventListener('input', debounceCalculate);
-            // Note: zone-card inputs are attached dynamically in renderTrunkSpaces
-        });
+        // Note: box-row and zone-card inputs are attached dynamically in their render functions
 
         document.getElementById('allowRotation').addEventListener('change', calculateOptimal);
-
-        document.querySelectorAll('.box-row input[type="checkbox"]').forEach(el => {
-            el.addEventListener('change', calculateOptimal);
-        });
 
         document.getElementById('showWireframe').addEventListener('change', updateViz);
 
@@ -1619,13 +1686,25 @@
             let spacePresets, boxPresets;
             if (unit === 'in') {
                 spacePresets = [{ w: 40, h: 20, d: 24 }];
-                boxPresets = { box1W: 8, box1H: 6, box1D: 6, box2W: 12, box2H: 8, box2D: 10, box3W: 16, box3H: 12, box3D: 12 };
+                boxPresets = [
+                    { name: 'Small', w: 8, h: 6, d: 6 },
+                    { name: 'Medium', w: 12, h: 8, d: 10 },
+                    { name: 'Large', w: 16, h: 12, d: 12 }
+                ];
             } else if (unit === 'cm') {
                 spacePresets = [{ w: 100, h: 50, d: 60 }];
-                boxPresets = { box1W: 20, box1H: 15, box1D: 15, box2W: 30, box2H: 20, box2D: 25, box3W: 40, box3H: 30, box3D: 30 };
+                boxPresets = [
+                    { name: 'Small', w: 20, h: 15, d: 15 },
+                    { name: 'Medium', w: 30, h: 20, d: 25 },
+                    { name: 'Large', w: 40, h: 30, d: 30 }
+                ];
             } else if (unit === 'mm') {
                 spacePresets = [{ w: 1000, h: 500, d: 600 }];
-                boxPresets = { box1W: 200, box1H: 150, box1D: 150, box2W: 300, box2H: 200, box2D: 250, box3W: 400, box3H: 300, box3D: 300 };
+                boxPresets = [
+                    { name: 'Small', w: 200, h: 150, d: 150 },
+                    { name: 'Medium', w: 300, h: 200, d: 250 },
+                    { name: 'Large', w: 400, h: 300, d: 300 }
+                ];
             }
             if (spacePresets && confirm(`Update to typical ${unit} values?`)) {
                 // Update trunk spaces
@@ -1638,11 +1717,17 @@
                 }));
                 renderTrunkSpaces();
 
-                // Update box dimensions
-                Object.keys(boxPresets).forEach(k => {
-                    const el = document.getElementById(k);
-                    if (el) el.value = boxPresets[k];
-                });
+                // Update box types
+                boxTypeConfigs = boxPresets.map((b, i) => ({
+                    id: i,
+                    name: b.name,
+                    w: b.w,
+                    h: b.h,
+                    d: b.d,
+                    enabled: true
+                }));
+                nextBoxId = boxTypeConfigs.length;
+                renderBoxTypes();
             }
             calculateOptimal();
         });
