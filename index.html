@@ -632,6 +632,15 @@
                 <div class="options-row">
                     <label class="opt"><input type="checkbox" id="allowRotation" checked> Rotate</label>
                     <label class="opt"><input type="checkbox" id="showWireframe" checked> Wireframe</label>
+                    <select class="unit-sel" id="spacePriority">
+                        <option value="balanced" selected>Balanced</option>
+                        <option value="front">Front First</option>
+                        <option value="back">Back First</option>
+                    </select>
+                    <select class="unit-sel" id="heightStrategy">
+                        <option value="minimize" selected>Min Height</option>
+                        <option value="fill">Fill Complete</option>
+                    </select>
                     <select class="unit-sel" id="unit">
                         <option value="in" selected>inches</option>
                         <option value="cm">cm</option>
@@ -953,6 +962,8 @@
                 document.getElementById('allowRotation').checked = data.options.rotate;
                 document.getElementById('showWireframe').checked = data.options.wireframe;
                 document.getElementById('unit').value = data.options.unit || 'in';
+                document.getElementById('spacePriority').value = data.options.spacePriority || 'balanced';
+                document.getElementById('heightStrategy').value = data.options.heightStrategy || 'minimize';
             }
             // Recalculate after applying settings
             setTimeout(calculateOptimal, 100);
@@ -981,7 +992,9 @@
                         options: {
                             rotate: document.getElementById('allowRotation').checked,
                             wireframe: document.getElementById('showWireframe').checked,
-                            unit: document.getElementById('unit').value
+                            unit: document.getElementById('unit').value,
+                            spacePriority: document.getElementById('spacePriority').value,
+                            heightStrategy: document.getElementById('heightStrategy').value
                         }
                     };
                     
@@ -1353,7 +1366,10 @@
         // Try to place a box with any valid orientation, prioritizing tight packing
         function tryPlaceOneBox(boxW, boxH, boxD, rotate) {
             const orientations = rotate ? getOrients(boxW, boxH, boxD) : [{w: boxW, h: boxH, d: boxD}];
-            
+
+            const spacePriority = document.getElementById('spacePriority').value;
+            const heightStrategy = document.getElementById('heightStrategy').value;
+
             let bestPos = null;
             let bestOrient = null;
             let bestScore = Infinity;
@@ -1363,25 +1379,81 @@
                 if (o.w > totalWidth || o.d > totalDepth) continue;
                 if (o.h > maxHeight) continue;
 
-                // Scan positions: bottom-up (y), front-to-back (z), left-to-right (x)
-                for (let y = 0; y + o.h <= maxHeight; y++) {
-                    for (let z = 0; z + o.d <= totalDepth; z++) {
+                // Determine scan order based on preferences
+                let yLoop, zLoop;
+
+                if (heightStrategy === 'minimize') {
+                    // Minimize height: scan bottom-up (low y first)
+                    yLoop = Array.from({length: Math.ceil(maxHeight)}, (_, i) => i);
+                } else {
+                    // Fill completely: scan by space, filling each space completely
+                    yLoop = Array.from({length: Math.ceil(maxHeight)}, (_, i) => i);
+                }
+
+                if (spacePriority === 'front') {
+                    // Front first: scan front-to-back (low z first)
+                    zLoop = Array.from({length: Math.ceil(totalDepth)}, (_, i) => i);
+                } else if (spacePriority === 'back') {
+                    // Back first: scan back-to-front (high z first)
+                    zLoop = Array.from({length: Math.ceil(totalDepth)}, (_, i) => i).reverse();
+                } else {
+                    // Balanced: scan front-to-back
+                    zLoop = Array.from({length: Math.ceil(totalDepth)}, (_, i) => i);
+                }
+
+                for (const y of yLoop) {
+                    if (y + o.h > maxHeight) continue;
+
+                    for (const z of zLoop) {
+                        if (z + o.d > totalDepth) continue;
+
                         for (let x = 0; x + o.w <= totalWidth; x++) {
                             if (canPlaceBox(x, y, z, o.w, o.h, o.d)) {
-                                // Score: prioritize bottom (y), then front (z), then left (x)
-                                const score = y * 100000 + z * 1000 + x;
+                                // Calculate score based on strategy
+                                let score;
+
+                                if (heightStrategy === 'fill' && spacePriority !== 'balanced') {
+                                    // Fill Complete + Space Priority: prioritize filling current space completely
+                                    // Find which space this position is in
+                                    let spaceIndex = 0;
+                                    for (let i = 0; i < spaceDepthBounds.length; i++) {
+                                        if (z >= spaceDepthBounds[i].start && z < spaceDepthBounds[i].end) {
+                                            spaceIndex = i;
+                                            break;
+                                        }
+                                    }
+
+                                    if (spacePriority === 'front') {
+                                        // Front first: prioritize lower space indices, then fill height
+                                        score = spaceIndex * 10000000 + z * 100000 + y * 1000 + x;
+                                    } else {
+                                        // Back first: prioritize higher space indices, then fill height
+                                        score = (spaceDepthBounds.length - spaceIndex) * 10000000 + z * 100000 + y * 1000 + x;
+                                    }
+                                } else if (heightStrategy === 'fill') {
+                                    // Fill Complete + Balanced: fill by depth zones, prioritize height within each
+                                    score = z * 100000 + y * 1000 + x;
+                                } else if (spacePriority === 'front') {
+                                    // Minimize Height + Front First: low height across all, prefer front
+                                    score = y * 100000 + z * 1000 + x;
+                                } else if (spacePriority === 'back') {
+                                    // Minimize Height + Back First: low height across all, prefer back
+                                    score = y * 100000 + (totalDepth - z) * 1000 + x;
+                                } else {
+                                    // Minimize Height + Balanced: standard bottom-up, front-to-back
+                                    score = y * 100000 + z * 1000 + x;
+                                }
+
                                 if (score < bestScore) {
                                     bestScore = score;
                                     bestPos = { x, y, z };
                                     bestOrient = o;
                                 }
-                                // Found a spot at this y,z - no need to check more x
+                                // Found a spot at this position
                                 break;
                             }
                         }
                     }
-                    // If we found something at this y level, might be good enough
-                    if (bestPos && bestScore < (y + 1) * 100000) break;
                 }
             }
 
@@ -1690,6 +1762,10 @@
         document.getElementById('allowRotation').addEventListener('change', calculateOptimal);
 
         document.getElementById('showWireframe').addEventListener('change', updateViz);
+
+        document.getElementById('spacePriority').addEventListener('change', calculateOptimal);
+
+        document.getElementById('heightStrategy').addEventListener('change', calculateOptimal);
 
         document.getElementById('unit').addEventListener('change', function() {
             const unit = this.value;
