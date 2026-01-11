@@ -1289,7 +1289,9 @@
             camera.position.x = r * Math.sin(rotY) * Math.cos(rotX);
             camera.position.y = r * Math.sin(rotX) + 50;
             camera.position.z = r * Math.cos(rotY) * Math.cos(rotX);
-            camera.lookAt(0, 20, 0);
+            // Look at the center of the trunk height for better vertical centering
+            const centerY = maxHeight > 0 ? maxHeight / 2 : 10;
+            camera.lookAt(0, centerY, 0);
             renderer.render(scene, camera);
         }
 
