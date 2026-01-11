@@ -697,6 +697,7 @@
         let placedBoxes = [];
         let totalTrunkVolume = 0;
         let nextBoxId = 0;
+        let manualQuantities = {};  // Track user's manual quantity adjustments
 
         // Unified space: one 3D grid for the trunk
         let occupied = null;  // 3D boolean array
@@ -1419,16 +1420,19 @@
                 for (const boxType of sortedTypes) {
                     let boxCount = 0;
                     const YIELD_INTERVAL = 50; // Yield every 50 boxes
-                    
-                    while (boxCount < 1000) { // Safety limit
+
+                    // Check if there's a manual quantity limit for this box type
+                    const maxQuantity = manualQuantities[boxType.id] !== undefined ? manualQuantities[boxType.id] : 1000;
+
+                    while (boxCount < maxQuantity) {
                         // Yield periodically to keep UI responsive
                         if (boxCount > 0 && boxCount % YIELD_INTERVAL === 0) {
                             await yieldToBrowser();
                         }
-                        
+
                         const result = tryPlaceOneBox(boxType.w, boxType.h, boxType.d, rotate);
                         if (!result) break;
-                        
+
                         const { pos, orient } = result;
                         occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
                         placedBoxes.push({
@@ -1529,44 +1533,33 @@
 
         function addBox(boxId) {
             if (isCalculating) return; // Don't allow during calculation
-            
-            const bt = boxTypes.find(b => b.id === boxId);
-            if (!bt) return;
 
-            const rotate = document.getElementById('allowRotation').checked;
-            const result = tryPlaceOneBox(bt.w, bt.h, bt.d, rotate);
+            // Get current count for this box type
+            const currentCount = placedBoxes.filter(b => b.boxId === boxId).length;
 
-            if (result) {
-                const { pos, orient } = result;
-                occupySpace(pos.x, pos.y, pos.z, orient.w, orient.h, orient.d);
-                placedBoxes.push({
-                    boxId: bt.id,
-                    x: pos.x, y: pos.y, z: pos.z,
-                    w: orient.w, h: orient.h, d: orient.d,
-                    color: bt.color,
-                    name: bt.name
-                });
-                updateUI();
-                requestAnimationFrame(() => updateViz());
-            }
+            // Set manual quantity to current + 1
+            manualQuantities[boxId] = currentCount + 1;
+
+            // Re-optimize with the new quantity to ensure proper stacking
+            calculateOptimal();
         }
 
         function removeBox(boxId) {
             if (isCalculating) return; // Don't allow during calculation
-            
-            for (let i = placedBoxes.length - 1; i >= 0; i--) {
-                if (placedBoxes[i].boxId === boxId) {
-                    const box = placedBoxes[i];
-                    freeSpace(box.x, box.y, box.z, box.w, box.h, box.d);
-                    placedBoxes.splice(i, 1);
-                    updateUI();
-                    requestAnimationFrame(() => updateViz());
-                    return;
-                }
-            }
+
+            // Get current count for this box type
+            const currentCount = placedBoxes.filter(b => b.boxId === boxId).length;
+
+            // Set manual quantity to current - 1 (minimum 0)
+            manualQuantities[boxId] = Math.max(0, currentCount - 1);
+
+            // Re-optimize with the new quantity to ensure proper stacking
+            calculateOptimal();
         }
 
         function resetToOptimal() {
+            // Clear manual quantities to allow optimal packing
+            manualQuantities = {};
             calculateOptimal();
         }
 
