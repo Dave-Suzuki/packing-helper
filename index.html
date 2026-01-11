@@ -1534,11 +1534,14 @@
         function addBox(boxId) {
             if (isCalculating) return; // Don't allow during calculation
 
-            // Get current count for this box type
-            const currentCount = placedBoxes.filter(b => b.boxId === boxId).length;
+            // Lock all box types to their current quantities
+            boxTypes.forEach(bt => {
+                const currentCount = placedBoxes.filter(b => b.boxId === bt.id).length;
+                manualQuantities[bt.id] = currentCount;
+            });
 
-            // Set manual quantity to current + 1
-            manualQuantities[boxId] = currentCount + 1;
+            // Then increment only the requested box type
+            manualQuantities[boxId] = manualQuantities[boxId] + 1;
 
             // Re-optimize with the new quantity to ensure proper stacking
             calculateOptimal();
@@ -1547,11 +1550,14 @@
         function removeBox(boxId) {
             if (isCalculating) return; // Don't allow during calculation
 
-            // Get current count for this box type
-            const currentCount = placedBoxes.filter(b => b.boxId === boxId).length;
+            // Lock all box types to their current quantities
+            boxTypes.forEach(bt => {
+                const currentCount = placedBoxes.filter(b => b.boxId === bt.id).length;
+                manualQuantities[bt.id] = currentCount;
+            });
 
-            // Set manual quantity to current - 1 (minimum 0)
-            manualQuantities[boxId] = Math.max(0, currentCount - 1);
+            // Then decrement only the requested box type (minimum 0)
+            manualQuantities[boxId] = Math.max(0, manualQuantities[boxId] - 1);
 
             // Re-optimize with the new quantity to ensure proper stacking
             calculateOptimal();
