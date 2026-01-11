@@ -918,7 +918,18 @@
             }
             if (data.boxTypes && data.boxTypes.length > 0) {
                 boxTypeConfigs = data.boxTypes;
-                nextBoxId = Math.max(...boxTypeConfigs.map(b => b.id)) + 1;
+                // Fix any duplicate IDs
+                const seenIds = new Set();
+                let maxId = 0;
+                boxTypeConfigs.forEach(box => {
+                    if (seenIds.has(box.id)) {
+                        // Duplicate ID found, assign a new one
+                        box.id = maxId + 1;
+                    }
+                    seenIds.add(box.id);
+                    maxId = Math.max(maxId, box.id);
+                });
+                nextBoxId = maxId + 1;
                 renderBoxTypes();
             } else if (data.boxes) {
                 // Legacy support - convert old format to new
@@ -934,7 +945,7 @@
                         enabled: b.enabled
                     });
                 }
-                nextBoxId = boxTypeConfigs.length;
+                nextBoxId = Math.max(...boxTypeConfigs.map(b => b.id)) + 1;
                 renderBoxTypes();
             }
             if (data.options) {
