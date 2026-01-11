@@ -102,27 +102,72 @@
 
         .trunk-zones {
             display: flex;
+            flex-direction: column;
             gap: 0.5rem;
+            margin-bottom: 0.5rem;
         }
 
         .zone-card {
-            flex: 1;
             background: rgba(255,255,255,0.05);
             border-radius: 8px;
             padding: 0.6rem;
+            position: relative;
         }
 
-        .zone-card.back { border-top: 2px solid #a78bfa; }
-        .zone-card.front { border-top: 2px solid #4ecdc4; }
+        .zone-card.space-0 { border-top: 2px solid #a78bfa; }
+        .zone-card.space-1 { border-top: 2px solid #4ecdc4; }
+        .zone-card.space-2 { border-top: 2px solid #ffd93d; }
+        .zone-card.space-3 { border-top: 2px solid #ff6b6b; }
 
         .zone-title {
             font-weight: 600;
             font-size: 0.8rem;
             margin-bottom: 0.4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .zone-title.back { color: #a78bfa; }
-        .zone-title.front { color: #4ecdc4; }
+        .zone-title.space-0 { color: #a78bfa; }
+        .zone-title.space-1 { color: #4ecdc4; }
+        .zone-title.space-2 { color: #ffd93d; }
+        .zone-title.space-3 { color: #ff6b6b; }
+
+        .remove-space-btn {
+            padding: 0.2rem 0.5rem;
+            background: rgba(255,100,100,0.2);
+            border: 1px solid rgba(255,100,100,0.4);
+            border-radius: 4px;
+            color: #ff6b6b;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .remove-space-btn:hover {
+            background: rgba(255,100,100,0.3);
+        }
+
+        .add-space-btn {
+            width: 100%;
+            padding: 0.6rem;
+            background: rgba(78, 205, 196, 0.1);
+            border: 1px dashed rgba(78, 205, 196, 0.4);
+            border-radius: 6px;
+            color: #4ecdc4;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-space-btn:hover:not(:disabled) {
+            background: rgba(78, 205, 196, 0.2);
+            border-style: solid;
+        }
+
+        .add-space-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
 
         .dim-row {
             display: flex;
@@ -505,7 +550,6 @@
             .canvas-wrap { height: 50vh; min-height: 300px; }
             .canvas-wrap.hidden { display: none; }
             .canvas-wrap.fullscreen { height: calc(100vh - 96px); }
-            .trunk-zones { flex-direction: column; }
             .zone-card { padding: 0.75rem; }
             .dim-row { gap: 0.5rem; }
             .dim-group input { padding: 0.6rem 0.25rem; font-size: 1rem; }
@@ -552,44 +596,10 @@
                 <div class="section">
                     <div class="section-header">
                         <span>📐</span>
-                        <h3>Trunk Space (Centered Connection)</h3>
+                        <h3>Trunk Spaces</h3>
                     </div>
-                    <div class="trunk-zones">
-                        <div class="zone-card back">
-                            <div class="zone-title back">◀ Back (taller)</div>
-                            <div class="dim-row">
-                                <div class="dim-group">
-                                    <label>W</label>
-                                    <input type="number" id="backW" value="40" min="1" inputmode="decimal">
-                                </div>
-                                <div class="dim-group">
-                                    <label>H</label>
-                                    <input type="number" id="backH" value="20" min="1" inputmode="decimal">
-                                </div>
-                                <div class="dim-group">
-                                    <label>D</label>
-                                    <input type="number" id="backD" value="24" min="1" inputmode="decimal">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="zone-card front">
-                            <div class="zone-title front">Front (shorter) ▶</div>
-                            <div class="dim-row">
-                                <div class="dim-group">
-                                    <label>W</label>
-                                    <input type="number" id="frontW" value="40" min="1" inputmode="decimal">
-                                </div>
-                                <div class="dim-group">
-                                    <label>H</label>
-                                    <input type="number" id="frontH" value="14" min="1" inputmode="decimal">
-                                </div>
-                                <div class="dim-group">
-                                    <label>D</label>
-                                    <input type="number" id="frontD" value="20" min="1" inputmode="decimal">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="trunk-zones" id="trunkZones"></div>
+                    <button class="add-space-btn" id="addSpaceBtn" onclick="addTrunkSpace()">+ Add Space</button>
                 </div>
 
                 <div class="section">
@@ -687,8 +697,10 @@
 
         const colors = [0xff6b6b, 0xffd93d, 0x6bcb77];
         const colorNames = ['#ff6b6b', '#ffd93d', '#6bcb77'];
+        const spaceColors = [0xa78bfa, 0x4ecdc4, 0xffd93d, 0xff6b6b];
+        const spaceColorNames = ['#a78bfa', '#4ecdc4', '#ffd93d', '#ff6b6b'];
 
-        let trunkDims = {};
+        let trunkSpaces = [];  // Array of trunk spaces
         let boxTypes = [];
         let placedBoxes = [];
         let totalTrunkVolume = 0;
@@ -697,13 +709,10 @@
         let occupied = null;  // 3D boolean array
         let totalWidth = 0;
         let totalDepth = 0;
-        let backDepth = 0;
-        let backHeight = 0;
-        let frontHeight = 0;
-        
-        // Centering offsets
-        let trunkBackOffset = 0;
-        let trunkFrontOffset = 0;
+        let maxHeight = 0;
+
+        // Track depth boundaries for each space
+        let spaceDepthBounds = [];  // [{start, end, width, height, offset}]
 
         let saveTimeout;
         let isCalculating = false;
@@ -717,6 +726,94 @@
                 setTimeout(resolve, 0);
             }
         });
+
+        // --- TRUNK SPACE MANAGEMENT ---
+
+        function initTrunkSpaces() {
+            // Start with one space
+            trunkSpaces = [{
+                id: 0,
+                name: 'Space 1',
+                w: 40,
+                h: 20,
+                d: 24
+            }];
+            renderTrunkSpaces();
+        }
+
+        function addTrunkSpace() {
+            if (trunkSpaces.length >= 4) return;
+
+            const newId = trunkSpaces.length;
+            trunkSpaces.push({
+                id: newId,
+                name: `Space ${newId + 1}`,
+                w: 40,
+                h: 20,
+                d: 20
+            });
+            renderTrunkSpaces();
+            saveSettings();
+            calculateOptimal();
+        }
+
+        function removeTrunkSpace(id) {
+            if (trunkSpaces.length <= 1) return;
+
+            trunkSpaces = trunkSpaces.filter(s => s.id !== id);
+            // Renumber remaining spaces
+            trunkSpaces.forEach((s, i) => {
+                s.id = i;
+                s.name = `Space ${i + 1}`;
+            });
+            renderTrunkSpaces();
+            saveSettings();
+            calculateOptimal();
+        }
+
+        function updateTrunkSpace(id, field, value) {
+            const space = trunkSpaces.find(s => s.id === id);
+            if (space) {
+                space[field] = parseFloat(value) || 0;
+                saveSettings();
+            }
+        }
+
+        function renderTrunkSpaces() {
+            const container = document.getElementById('trunkZones');
+            const addBtn = document.getElementById('addSpaceBtn');
+
+            container.innerHTML = trunkSpaces.map((space, index) => `
+                <div class="zone-card space-${index}">
+                    <div class="zone-title space-${index}">
+                        <span>${space.name}</span>
+                        ${trunkSpaces.length > 1 ? `<button class="remove-space-btn" onclick="removeTrunkSpace(${space.id})">Remove</button>` : ''}
+                    </div>
+                    <div class="dim-row">
+                        <div class="dim-group">
+                            <label>W</label>
+                            <input type="number" id="space${space.id}W" value="${space.w}" min="1" inputmode="decimal" onchange="updateTrunkSpace(${space.id}, 'w', this.value)">
+                        </div>
+                        <div class="dim-group">
+                            <label>H</label>
+                            <input type="number" id="space${space.id}H" value="${space.h}" min="1" inputmode="decimal" onchange="updateTrunkSpace(${space.id}, 'h', this.value)">
+                        </div>
+                        <div class="dim-group">
+                            <label>D</label>
+                            <input type="number" id="space${space.id}D" value="${space.d}" min="1" inputmode="decimal" onchange="updateTrunkSpace(${space.id}, 'd', this.value)">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Update add button state
+            addBtn.disabled = trunkSpaces.length >= 4;
+
+            // Re-attach debounced listeners to new inputs
+            document.querySelectorAll('.zone-card input').forEach(el => {
+                el.addEventListener('input', debounceCalculate);
+            });
+        }
 
         // --- LOCAL STORAGE LOGIC (Replaces Cloud) ---
 
@@ -733,13 +830,18 @@
         }
 
         function applySettings(data) {
-            if (data.trunk) {
-                document.getElementById('backW').value = data.trunk.backW;
-                document.getElementById('backH').value = data.trunk.backH;
-                document.getElementById('backD').value = data.trunk.backD;
-                document.getElementById('frontW').value = data.trunk.frontW;
-                document.getElementById('frontH').value = data.trunk.frontH;
-                document.getElementById('frontD').value = data.trunk.frontD;
+            if (data.trunkSpaces && data.trunkSpaces.length > 0) {
+                trunkSpaces = data.trunkSpaces;
+                renderTrunkSpaces();
+            } else if (data.trunk) {
+                // Legacy support - convert old format to new
+                trunkSpaces = [
+                    { id: 0, name: 'Space 1', w: data.trunk.backW, h: data.trunk.backH, d: data.trunk.backD }
+                ];
+                if (data.trunk.frontW && data.trunk.frontD && data.trunk.frontH) {
+                    trunkSpaces.push({ id: 1, name: 'Space 2', w: data.trunk.frontW, h: data.trunk.frontH, d: data.trunk.frontD });
+                }
+                renderTrunkSpaces();
             }
             if (data.boxes) {
                 for (const boxId in data.boxes) {
@@ -778,7 +880,13 @@
                     }
 
                     const data = {
-                        trunk: getDims(),
+                        trunkSpaces: trunkSpaces.map(s => ({
+                            id: s.id,
+                            name: s.name,
+                            w: parseFloat(document.getElementById(`space${s.id}W`)?.value) || s.w,
+                            h: parseFloat(document.getElementById(`space${s.id}H`)?.value) || s.h,
+                            d: parseFloat(document.getElementById(`space${s.id}D`)?.value) || s.d
+                        })),
                         boxes: boxData,
                         options: {
                             rotate: document.getElementById('allowRotation').checked,
@@ -886,12 +994,15 @@
             window.addEventListener('resize', onResize);
             window.addEventListener('orientationchange', () => setTimeout(onResize, 100));
 
-            // Load settings first, then calculate
+            // Initialize trunk spaces first
+            initTrunkSpaces();
+
+            // Load settings (may override trunk spaces)
             loadSettings();
-            
+
             // Initial render
             renderer.render(scene, camera);
-            
+
             // Start calculation and animation
             calculateOptimal();
             animate();
@@ -1004,61 +1115,75 @@
         }
 
         function getDims() {
-            return {
-                backW: parseFloat(document.getElementById('backW').value) || 0,
-                backH: parseFloat(document.getElementById('backH').value) || 0,
-                backD: parseFloat(document.getElementById('backD').value) || 0,
-                frontW: parseFloat(document.getElementById('frontW').value) || 0,
-                frontH: parseFloat(document.getElementById('frontH').value) || 0,
-                frontD: parseFloat(document.getElementById('frontD').value) || 0
-            };
+            // Return array of spaces with current input values
+            return trunkSpaces.map(s => ({
+                id: s.id,
+                name: s.name,
+                w: parseFloat(document.getElementById(`space${s.id}W`)?.value) || s.w,
+                h: parseFloat(document.getElementById(`space${s.id}H`)?.value) || s.h,
+                d: parseFloat(document.getElementById(`space${s.id}D`)?.value) || s.d
+            }));
         }
 
         // Get the maximum allowed height at a given Z position
         function getMaxHeightAtZ(z) {
-            if (z < backDepth) {
-                return backHeight;
-            } else {
-                return frontHeight;
+            for (const bound of spaceDepthBounds) {
+                if (z >= bound.start && z < bound.end) {
+                    return bound.height;
+                }
             }
+            return 0;
         }
 
         // Initialize unified occupation grid with CENTERED logic
         function initOccupationGrid() {
-            const dims = trunkDims;
-            totalWidth = Math.max(dims.backW, dims.frontW);
-            backDepth = dims.backD;
-            totalDepth = dims.backD + dims.frontD;
-            backHeight = dims.backH;
-            frontHeight = dims.frontH;
+            const spaces = getDims();
 
-            // Calculate offsets to center the sections
-            trunkBackOffset = Math.floor((totalWidth - dims.backW) / 2);
-            trunkFrontOffset = Math.floor((totalWidth - dims.frontW) / 2);
+            // Calculate total dimensions
+            totalWidth = Math.max(...spaces.map(s => s.w));
+            totalDepth = spaces.reduce((sum, s) => sum + s.d, 0);
+            maxHeight = Math.max(...spaces.map(s => s.h));
+
+            // Calculate depth boundaries and offsets for each space
+            spaceDepthBounds = [];
+            let currentDepth = 0;
+            for (const space of spaces) {
+                spaceDepthBounds.push({
+                    start: currentDepth,
+                    end: currentDepth + space.d,
+                    width: space.w,
+                    height: space.h,
+                    offset: Math.floor((totalWidth - space.w) / 2)
+                });
+                currentDepth += space.d;
+            }
 
             // Create unified grid
-            occupied = new Array(Math.ceil(totalWidth)).fill(null).map(() => 
-                new Array(Math.ceil(Math.max(backHeight, frontHeight))).fill(null).map(() => 
+            occupied = new Array(Math.ceil(totalWidth)).fill(null).map(() =>
+                new Array(Math.ceil(maxHeight)).fill(null).map(() =>
                     new Array(Math.ceil(totalDepth)).fill(false)
                 )
             );
 
             // Mark out-of-bounds areas as occupied (Center aligned)
             for (let x = 0; x < Math.ceil(totalWidth); x++) {
-                for (let y = 0; y < Math.ceil(Math.max(backHeight, frontHeight)); y++) {
+                for (let y = 0; y < Math.ceil(maxHeight); y++) {
                     for (let z = 0; z < Math.ceil(totalDepth); z++) {
-                        // Back zone
-                        if (z < backDepth) {
-                            // Block if left of start OR right of end OR too high
-                            if (x < trunkBackOffset || x >= trunkBackOffset + dims.backW || y >= dims.backH) {
-                                occupied[x][y][z] = true;
+                        let isValid = false;
+
+                        // Check each space
+                        for (const bound of spaceDepthBounds) {
+                            if (z >= bound.start && z < bound.end) {
+                                // Check if within this space's bounds
+                                if (x >= bound.offset && x < bound.offset + bound.width && y < bound.height) {
+                                    isValid = true;
+                                    break;
+                                }
                             }
                         }
-                        // Front zone
-                        else {
-                            if (x < trunkFrontOffset || x >= trunkFrontOffset + dims.frontW || y >= dims.frontH) {
-                                occupied[x][y][z] = true;
-                            }
+
+                        if (!isValid) {
+                            occupied[x][y][z] = true;
                         }
                     }
                 }
@@ -1110,20 +1235,24 @@
             const xStart = Math.floor(x), xEnd = Math.ceil(x + w);
             const yStart = Math.floor(y), yEnd = Math.ceil(y + h);
             const zStart = Math.floor(z), zEnd = Math.ceil(z + d);
-            
+
             for (let ix = xStart; ix < xEnd; ix++) {
                 for (let iy = yStart; iy < yEnd; iy++) {
                     for (let iz = zStart; iz < zEnd; iz++) {
                         if (ix >= occupied.length || iy >= occupied[0].length || iz >= occupied[0][0].length) continue;
-                        
+
                         // Only free cells within valid trunk bounds
-                        const isBack = iz < backDepth;
-                        const validXStart = isBack ? trunkBackOffset : trunkFrontOffset;
-                        const validXEnd = isBack ? (trunkBackOffset + trunkDims.backW) : (trunkFrontOffset + trunkDims.frontW);
-                        const validH = isBack ? backHeight : frontHeight;
-                        
-                        if (ix >= validXStart && ix < validXEnd && iy < validH) {
-                            occupied[ix][iy][iz] = false;
+                        for (const bound of spaceDepthBounds) {
+                            if (iz >= bound.start && iz < bound.end) {
+                                const validXStart = bound.offset;
+                                const validXEnd = bound.offset + bound.width;
+                                const validH = bound.height;
+
+                                if (ix >= validXStart && ix < validXEnd && iy < validH) {
+                                    occupied[ix][iy][iz] = false;
+                                }
+                                break;
+                            }
                         }
                     }
                 }
@@ -1141,10 +1270,10 @@
             for (const o of orientations) {
                 // Quick bounds check
                 if (o.w > totalWidth || o.d > totalDepth) continue;
-                if (o.h > backHeight && o.h > frontHeight) continue;
+                if (o.h > maxHeight) continue;
 
                 // Scan positions: bottom-up (y), front-to-back (z), left-to-right (x)
-                for (let y = 0; y + o.h <= Math.max(backHeight, frontHeight); y++) {
+                for (let y = 0; y + o.h <= maxHeight; y++) {
                     for (let z = 0; z + o.d <= totalDepth; z++) {
                         for (let x = 0; x + o.w <= totalWidth; x++) {
                             if (canPlaceBox(x, y, z, o.w, o.h, o.d)) {
@@ -1184,13 +1313,12 @@
             try {
                 // Allow UI to update before starting heavy computation
                 await yieldToBrowser();
-                
-                trunkDims = getDims();
+
+                const spaces = getDims();
                 boxTypes = getBoxTypesFromUI();
                 const rotate = document.getElementById('allowRotation').checked;
 
-                totalTrunkVolume = (trunkDims.backW * trunkDims.backH * trunkDims.backD) + 
-                                  (trunkDims.frontW * trunkDims.frontH * trunkDims.frontD);
+                totalTrunkVolume = spaces.reduce((sum, s) => sum + (s.w * s.h * s.d), 0);
 
                 initOccupationGrid();
                 placedBoxes = [];
@@ -1354,10 +1482,15 @@
 
         function updateLegend(boxes) {
             if (!boxes) boxes = boxTypes;
-            let html = `
-                <div class="legend-item"><div class="legend-color" style="background:rgba(167,139,250,0.3);border:2px solid #a78bfa;"></div><span>Back (tall)</span></div>
-                <div class="legend-item"><div class="legend-color" style="background:rgba(78,205,196,0.3);border:2px solid #4ecdc4;"></div><span>Front (short)</span></div>
-            `;
+            let html = '';
+
+            // Add trunk spaces to legend
+            trunkSpaces.forEach((space, index) => {
+                const color = spaceColorNames[index];
+                html += `<div class="legend-item"><div class="legend-color" style="background:rgba(${parseInt(color.slice(1,3), 16)},${parseInt(color.slice(3,5), 16)},${parseInt(color.slice(5,7), 16)},0.3);border:2px solid ${color};"></div><span>${space.name}</span></div>`;
+            });
+
+            // Add box types to legend
             for (const b of boxes) {
                 html += `<div class="legend-item"><div class="legend-color" style="background:${b.colorName};"></div><span>${b.name}</span></div>`;
             }
@@ -1378,9 +1511,9 @@
             
             clearGroups();
             const wire = document.getElementById('showWireframe').checked;
-            const dims = trunkDims;
+            const spaces = getDims();
 
-            const maxDim = Math.max(totalWidth, backHeight, totalDepth);
+            const maxDim = Math.max(totalWidth, maxHeight, totalDepth);
             if (maxDim === 0 || !scene || !renderer) return; // Safety checks
             const sc = 120 / maxDim;
 
@@ -1390,29 +1523,29 @@
 
             // Draw Centered trunk outline
             if (wire) {
-                // Back zone (taller)
-                const sbW = dims.backW * sc, sbH = dims.backH * sc, sbD = dims.backD * sc;
-                const bgeo = new THREE.BoxGeometry(sbW, sbH, sbD);
-                const bedge = new THREE.LineSegments(new THREE.EdgesGeometry(bgeo), new THREE.LineBasicMaterial({ color: 0xa78bfa }));
-                
-                // Position: Centered via offset
-                bedge.position.set(centerX + (trunkBackOffset * sc) + sbW/2, sbH/2, centerZ + sbD/2);
-                trunkGroup.add(bedge);
-                const bfill = new THREE.Mesh(bgeo, new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.06, side: THREE.BackSide }));
-                bfill.position.copy(bedge.position);
-                trunkGroup.add(bfill);
+                // Draw each trunk space
+                spaceDepthBounds.forEach((bound, index) => {
+                    const space = spaces[index];
+                    const sW = space.w * sc;
+                    const sH = space.h * sc;
+                    const sD = space.d * sc;
+                    const geo = new THREE.BoxGeometry(sW, sH, sD);
+                    const color = spaceColors[index];
 
-                // Front zone (shorter)
-                const sfW = dims.frontW * sc, sfH = dims.frontH * sc, sfD = dims.frontD * sc;
-                const fgeo = new THREE.BoxGeometry(sfW, sfH, sfD);
-                const fedge = new THREE.LineSegments(new THREE.EdgesGeometry(fgeo), new THREE.LineBasicMaterial({ color: 0x4ecdc4 }));
-                
-                // Position: Centered via offset
-                fedge.position.set(centerX + (trunkFrontOffset * sc) + sfW/2, sfH/2, centerZ + sbD + sfD/2);
-                trunkGroup.add(fedge);
-                const ffill = new THREE.Mesh(fgeo, new THREE.MeshBasicMaterial({ color: 0x4ecdc4, transparent: true, opacity: 0.06, side: THREE.BackSide }));
-                ffill.position.copy(fedge.position);
-                trunkGroup.add(ffill);
+                    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: color }));
+
+                    // Position: Centered via offset
+                    edge.position.set(
+                        centerX + (bound.offset * sc) + sW/2,
+                        sH/2,
+                        centerZ + bound.start * sc + sD/2
+                    );
+                    trunkGroup.add(edge);
+
+                    const fill = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.06, side: THREE.BackSide }));
+                    fill.position.copy(edge.position);
+                    trunkGroup.add(fill);
+                });
             }
 
             // Draw all placed boxes
@@ -1468,9 +1601,9 @@
         }
 
         // Only use input event with debounce - remove duplicate change listener
-        document.querySelectorAll('.zone-card input, .box-row input[type="number"]').forEach(el => {
+        document.querySelectorAll('.box-row input[type="number"]').forEach(el => {
             el.addEventListener('input', debounceCalculate);
-            // Remove change listener to prevent double calculation
+            // Note: zone-card inputs are attached dynamically in renderTrunkSpaces
         });
 
         document.getElementById('allowRotation').addEventListener('change', calculateOptimal);
@@ -1483,16 +1616,33 @@
 
         document.getElementById('unit').addEventListener('change', function() {
             const unit = this.value;
-            let presets;
+            let spacePresets, boxPresets;
             if (unit === 'in') {
-                presets = { backW: 40, backH: 20, backD: 24, frontW: 40, frontH: 14, frontD: 20, box1W: 8, box1H: 6, box1D: 6, box2W: 12, box2H: 8, box2D: 10, box3W: 16, box3H: 12, box3D: 12 };
+                spacePresets = [{ w: 40, h: 20, d: 24 }];
+                boxPresets = { box1W: 8, box1H: 6, box1D: 6, box2W: 12, box2H: 8, box2D: 10, box3W: 16, box3H: 12, box3D: 12 };
             } else if (unit === 'cm') {
-                presets = { backW: 100, backH: 50, backD: 60, frontW: 100, frontH: 35, frontD: 50, box1W: 20, box1H: 15, box1D: 15, box2W: 30, box2H: 20, box2D: 25, box3W: 40, box3H: 30, box3D: 30 };
+                spacePresets = [{ w: 100, h: 50, d: 60 }];
+                boxPresets = { box1W: 20, box1H: 15, box1D: 15, box2W: 30, box2H: 20, box2D: 25, box3W: 40, box3H: 30, box3D: 30 };
             } else if (unit === 'mm') {
-                presets = { backW: 1000, backH: 500, backD: 600, frontW: 1000, frontH: 350, frontD: 500, box1W: 200, box1H: 150, box1D: 150, box2W: 300, box2H: 200, box2D: 250, box3W: 400, box3H: 300, box3D: 300 };
+                spacePresets = [{ w: 1000, h: 500, d: 600 }];
+                boxPresets = { box1W: 200, box1H: 150, box1D: 150, box2W: 300, box2H: 200, box2D: 250, box3W: 400, box3H: 300, box3D: 300 };
             }
-            if (presets && confirm(`Update to typical ${unit} values?`)) {
-                Object.keys(presets).forEach(k => { document.getElementById(k).value = presets[k]; });
+            if (spacePresets && confirm(`Update to typical ${unit} values?`)) {
+                // Update trunk spaces
+                trunkSpaces = spacePresets.map((s, i) => ({
+                    id: i,
+                    name: `Space ${i + 1}`,
+                    w: s.w,
+                    h: s.h,
+                    d: s.d
+                }));
+                renderTrunkSpaces();
+
+                // Update box dimensions
+                Object.keys(boxPresets).forEach(k => {
+                    const el = document.getElementById(k);
+                    if (el) el.value = boxPresets[k];
+                });
             }
             calculateOptimal();
         });
