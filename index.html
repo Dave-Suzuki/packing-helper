@@ -273,8 +273,9 @@
         .box-name {
             background: transparent;
             border: none;
-            color: #fff;
+            color: #1c1b1f;
             font-size: 0.85rem;
+            font-weight: 500;
             width: 60px;
             min-width: 60px;
         }
@@ -315,8 +316,9 @@
             font-size: 0.8rem;
             cursor: pointer;
             padding: 0.4rem 0.6rem;
-            background: rgba(255,255,255,0.05);
+            background: transparent;
             border-radius: 6px;
+            color: #1c1b1f;
         }
 
         .opt input { 
@@ -327,11 +329,23 @@
 
         .unit-sel {
             padding: 0.4rem 0.6rem;
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 6px;
-            background: rgba(255,255,255,0.05);
-            color: #fff;
+            border: 1px solid #c4c7c5;
+            border-radius: 8px;
+            background: #fff;
+            color: #1c1b1f;
             font-size: 0.8rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .unit-sel:hover {
+            border-color: #4ecdc4;
+        }
+
+        .unit-sel:focus {
+            outline: none;
+            border-color: #4ecdc4;
+            border-width: 2px;
         }
 
         .calc-btn {
@@ -537,14 +551,14 @@
         .remaining-row {
             margin-top: 0.5rem;
             padding-top: 0.5rem;
-            border-top: 1px dashed rgba(255,255,255,0.1);
+            border-top: 1px dashed #c4c7c5;
             display: flex;
             justify-content: space-between;
             font-size: 0.8rem;
         }
 
-        .remaining-row .label { color: #888; }
-        .remaining-row .value { color: #ffd93d; font-weight: 600; }
+        .remaining-row .label { color: #49454f; }
+        .remaining-row .value { color: #006a60; font-weight: 600; }
 
         .canvas-wrap {
             flex: 1;
@@ -741,7 +755,7 @@
                 <canvas id="canvas3d"></canvas>
                 <div class="hint">👆 Drag to rotate • Pinch to zoom</div>
                 <div class="legend">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e0e0e0;">
                         <label style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; cursor: pointer;">
                             <input type="checkbox" id="showWireframe" checked style="accent-color: #4ecdc4;"> Wireframe
                         </label>
