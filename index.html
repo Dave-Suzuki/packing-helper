@@ -615,6 +615,11 @@
                     <div class="section-header">
                         <span>📐</span>
                         <h3>Trunk Spaces</h3>
+                        <select class="unit-sel" id="unit" style="margin-left: auto;">
+                            <option value="in" selected>inches</option>
+                            <option value="cm">cm</option>
+                            <option value="mm">mm</option>
+                        </select>
                     </div>
                     <div class="trunk-zones" id="trunkZones"></div>
                     <button class="add-space-btn" id="addSpaceBtn" onclick="addTrunkSpace()">+ Add Space</button>
@@ -629,23 +634,23 @@
                     <button class="add-space-btn" id="addBoxBtn" onclick="addBoxType()">+ Add Box Type</button>
                 </div>
 
-                <div class="options-row">
-                    <label class="opt"><input type="checkbox" id="allowRotation" checked> Rotate</label>
-                    <label class="opt"><input type="checkbox" id="showWireframe" checked> Wireframe</label>
-                    <select class="unit-sel" id="spacePriority">
-                        <option value="balanced" selected>Balanced</option>
-                        <option value="front">Front First</option>
-                        <option value="back">Back First</option>
-                    </select>
-                    <select class="unit-sel" id="heightStrategy">
-                        <option value="minimize" selected>Min Height</option>
-                        <option value="fill">Fill Complete</option>
-                    </select>
-                    <select class="unit-sel" id="unit">
-                        <option value="in" selected>inches</option>
-                        <option value="cm">cm</option>
-                        <option value="mm">mm</option>
-                    </select>
+                <div class="section">
+                    <div class="section-header">
+                        <span>⚙️</span>
+                        <h3>Packing Strategy</h3>
+                    </div>
+                    <div class="options-row">
+                        <label class="opt"><input type="checkbox" id="allowRotation" checked> Rotate</label>
+                        <select class="unit-sel" id="spacePriority">
+                            <option value="balanced" selected>Balanced</option>
+                            <option value="front">Front First</option>
+                            <option value="back">Back First</option>
+                        </select>
+                        <select class="unit-sel" id="heightStrategy">
+                            <option value="minimize" selected>Min Height</option>
+                            <option value="fill">Fill Complete</option>
+                        </select>
+                    </div>
                 </div>
 
                 <button class="calc-btn" onclick="calculateOptimal()">Calculate Optimal Fit</button>
@@ -683,7 +688,14 @@
             <div class="canvas-wrap" id="canvasWrap">
                 <canvas id="canvas3d"></canvas>
                 <div class="hint">👆 Drag to rotate • Pinch to zoom</div>
-                <div class="legend" id="legend"></div>
+                <div class="legend">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <label style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; cursor: pointer;">
+                            <input type="checkbox" id="showWireframe" checked style="accent-color: #4ecdc4;"> Wireframe
+                        </label>
+                    </div>
+                    <div id="legendItems"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1424,11 +1436,11 @@
                                     }
 
                                     if (spacePriority === 'front') {
-                                        // Front first: prioritize lower space indices, then fill height
+                                        // Front first: prioritize lower space indices, then fill from front (low z)
                                         score = spaceIndex * 10000000 + z * 100000 + y * 1000 + x;
                                     } else {
-                                        // Back first: prioritize higher space indices, then fill height
-                                        score = (spaceDepthBounds.length - spaceIndex) * 10000000 + z * 100000 + y * 1000 + x;
+                                        // Back first: prioritize higher space indices, then fill from back (high z)
+                                        score = (spaceDepthBounds.length - spaceIndex) * 10000000 + (totalDepth - z) * 100000 + y * 1000 + x;
                                     }
                                 } else if (heightStrategy === 'fill') {
                                     // Fill Complete + Balanced: fill by depth zones, prioritize height within each
@@ -1655,7 +1667,7 @@
             for (const b of boxes) {
                 html += `<div class="legend-item"><div class="legend-color" style="background:${b.colorName};"></div><span>${b.name}</span></div>`;
             }
-            document.getElementById('legend').innerHTML = html;
+            document.getElementById('legendItems').innerHTML = html;
         }
 
         function clearGroups() {
