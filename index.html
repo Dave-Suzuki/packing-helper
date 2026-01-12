@@ -644,16 +644,26 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                height: auto;
+                min-height: 100vh;
+                overflow: auto;
+            }
+            .app-container {
+                height: auto;
+                min-height: 100vh;
+            }
             header h1 { font-size: 1rem; }
             .tab-nav { display: flex; }
-            .main-content { flex-direction: column; }
-            .controls-panel { 
-                width: 100%; 
-                min-width: unset; 
-                padding: 0.75rem; 
+            .main-content { flex-direction: column; height: auto; }
+            .controls-panel {
+                width: 100%;
+                min-width: unset;
+                padding: 0.75rem;
                 border-right: none;
                 overflow-y: visible;
                 max-height: none;
+                height: auto;
             }
             .controls-panel.hidden { display: none; }
             .canvas-wrap { height: 50vh; min-height: 300px; }
