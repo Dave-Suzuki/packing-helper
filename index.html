@@ -883,8 +883,8 @@
         let isDragging = false, prevMouse = { x: 0, y: 0 };
         let rotX = 0.4, rotY = -0.5, zoom = 1;
 
-        const boxColors = [0x3b82f6, 0x60a5fa, 0x93c5fd, 0x2563eb, 0x1d4ed8, 0x1e40af, 0x6366f1, 0x818cf8, 0xa5b4fc, 0xc7d2fe];
-        const boxColorNames = ['#3b82f6', '#60a5fa', '#93c5fd', '#2563eb', '#1d4ed8', '#1e40af', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe'];
+        const boxColors = [0x3b82f6, 0x8b5cf6, 0xec4899, 0xef4444, 0xf97316, 0xeab308, 0x22c55e, 0x14b8a6, 0x6366f1, 0x06b6d4];
+        const boxColorNames = ['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#6366f1', '#06b6d4'];
         const spaceColors = [0x3b82f6, 0x60a5fa, 0x93c5fd, 0x2563eb];
         const spaceColorNames = ['#3b82f6', '#60a5fa', '#93c5fd', '#2563eb'];
 
@@ -1051,6 +1051,13 @@
                     box[field] = value;
                 } else if (field === 'name') {
                     box[field] = value;
+                    // Update the name in boxTypes as well if it exists
+                    const boxType = boxTypes.find(bt => bt.id === id);
+                    if (boxType) {
+                        boxType.name = value;
+                        // Refresh the UI to show the updated name in quantities section
+                        updateUI();
+                    }
                 } else {
                     box[field] = parseFloat(value) || 0;
                 }
@@ -1064,7 +1071,7 @@
             container.innerHTML = boxTypeConfigs.map((box, index) => `
                 <div class="box-row" style="border-left: 3px solid ${boxColorNames[index % boxColorNames.length]};">
                     <div class="box-check"><input type="checkbox" id="box${box.id}Enabled" ${box.enabled ? 'checked' : ''} onchange="updateBoxType(${box.id}, 'enabled', this.checked); calculateOptimal();"></div>
-                    <input type="text" class="box-name" id="box${box.id}Name" value="${box.name}" onchange="updateBoxType(${box.id}, 'name', this.value)">
+                    <input type="text" class="box-name" id="box${box.id}Name" value="${box.name}" oninput="updateBoxType(${box.id}, 'name', this.value)">
                     <div class="box-dims">
                         <div class="dim-group"><label>W</label><input type="number" id="box${box.id}W" value="${box.w}" min="1" inputmode="decimal" onchange="updateBoxType(${box.id}, 'w', this.value)"></div>
                         <div class="dim-group"><label>H</label><input type="number" id="box${box.id}H" value="${box.h}" min="1" inputmode="decimal" onchange="updateBoxType(${box.id}, 'h', this.value)"></div>
