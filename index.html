@@ -311,6 +311,25 @@
             height: 18px;
         }
 
+        .box-color {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .box-color::-webkit-color-swatch-wrapper {
+            padding: 2px;
+        }
+
+        .box-color::-webkit-color-swatch {
+            border: none;
+            border-radius: 4px;
+        }
+
         .box-name {
             background: transparent;
             border: none;
@@ -746,6 +765,7 @@
             }
 
             .controls-panel { padding: 0.5rem; }
+            .box-color { width: 28px; height: 28px; }
             .box-name { width: 55px; font-size: 0.8rem; }
             .qty-row .info { min-width: 60px; font-size: 0.8rem; }
             .qty-row .vol-info { display: none; }
@@ -1011,9 +1031,9 @@
         function initBoxTypes() {
             // Start with 3 default box types
             boxTypeConfigs = [
-                { id: 0, name: 'Small', w: 8, h: 6, d: 6, enabled: true },
-                { id: 1, name: 'Medium', w: 12, h: 8, d: 10, enabled: true },
-                { id: 2, name: 'Large', w: 16, h: 12, d: 12, enabled: true }
+                { id: 0, name: 'Small', w: 8, h: 6, d: 6, enabled: true, color: boxColorNames[0] },
+                { id: 1, name: 'Medium', w: 12, h: 8, d: 10, enabled: true, color: boxColorNames[1] },
+                { id: 2, name: 'Large', w: 16, h: 12, d: 12, enabled: true, color: boxColorNames[2] }
             ];
             nextBoxId = 3;
             renderBoxTypes();
@@ -1022,13 +1042,15 @@
         function addBoxType() {
             if (boxTypeConfigs.length >= 10) return;  // Limit to 10 box types
 
+            const index = boxTypeConfigs.length;
             boxTypeConfigs.push({
                 id: nextBoxId++,
                 name: `Box ${boxTypeConfigs.length + 1}`,
                 w: 10,
                 h: 10,
                 d: 10,
-                enabled: true
+                enabled: true,
+                color: boxColorNames[index % boxColorNames.length]
             });
             renderBoxTypes();
             saveSettings();
@@ -1058,6 +1080,22 @@
                         // Refresh the UI to show the updated name in quantities section
                         updateUI();
                     }
+                } else if (field === 'color') {
+                    box[field] = value;
+                    // Update the color in boxTypes as well if it exists
+                    const boxType = boxTypes.find(bt => bt.id === id);
+                    if (boxType) {
+                        boxType.color = parseInt(value.replace('#', '0x'), 16);
+                        boxType.colorName = value;
+                        // Update border color of the box row
+                        const boxRow = document.getElementById(`box${id}Color`).closest('.box-row');
+                        if (boxRow) {
+                            boxRow.style.borderLeftColor = value;
+                        }
+                        // Re-render the scene and UI
+                        render3D();
+                        updateUI();
+                    }
                 } else {
                     box[field] = parseFloat(value) || 0;
                 }
@@ -1069,8 +1107,9 @@
             const container = document.querySelector('.box-types-list');
 
             container.innerHTML = boxTypeConfigs.map((box, index) => `
-                <div class="box-row" style="border-left: 3px solid ${boxColorNames[index % boxColorNames.length]};">
+                <div class="box-row" style="border-left: 3px solid ${box.color};">
                     <div class="box-check"><input type="checkbox" id="box${box.id}Enabled" ${box.enabled ? 'checked' : ''} onchange="updateBoxType(${box.id}, 'enabled', this.checked); calculateOptimal();"></div>
+                    <input type="color" class="box-color" id="box${box.id}Color" value="${box.color}" onchange="updateBoxType(${box.id}, 'color', this.value)">
                     <input type="text" class="box-name" id="box${box.id}Name" value="${box.name}" oninput="updateBoxType(${box.id}, 'name', this.value)">
                     <div class="box-dims">
                         <div class="dim-group"><label>W</label><input type="number" id="box${box.id}W" value="${box.w}" min="1" inputmode="decimal" onchange="updateBoxType(${box.id}, 'w', this.value)"></div>
@@ -1123,22 +1162,27 @@
             }
             if (data.boxTypes && data.boxTypes.length > 0) {
                 boxTypeConfigs = data.boxTypes;
-                // Fix any duplicate IDs
+                // Fix any duplicate IDs and ensure colors exist
                 const seenIds = new Set();
                 let maxId = 0;
-                boxTypeConfigs.forEach(box => {
+                boxTypeConfigs.forEach((box, index) => {
                     if (seenIds.has(box.id)) {
                         // Duplicate ID found, assign a new one
                         box.id = maxId + 1;
                     }
                     seenIds.add(box.id);
                     maxId = Math.max(maxId, box.id);
+                    // Ensure color exists
+                    if (!box.color) {
+                        box.color = boxColorNames[index % boxColorNames.length];
+                    }
                 });
                 nextBoxId = maxId + 1;
                 renderBoxTypes();
             } else if (data.boxes) {
                 // Legacy support - convert old format to new
                 boxTypeConfigs = [];
+                let idx = 0;
                 for (const boxId in data.boxes) {
                     const b = data.boxes[boxId];
                     boxTypeConfigs.push({
@@ -1147,8 +1191,10 @@
                         w: b.w,
                         h: b.h,
                         d: b.d,
-                        enabled: b.enabled
+                        enabled: b.enabled,
+                        color: boxColorNames[idx % boxColorNames.length]
                     });
+                    idx++;
                 }
                 nextBoxId = Math.max(...boxTypeConfigs.map(b => b.id)) + 1;
                 renderBoxTypes();
@@ -1401,14 +1447,15 @@
             const boxes = [];
             boxTypeConfigs.forEach((box, index) => {
                 if (box.enabled) {
+                    const colorHex = box.color || boxColorNames[index % boxColorNames.length];
                     boxes.push({
                         id: box.id,
                         name: box.name,
                         w: box.w,
                         h: box.h,
                         d: box.d,
-                        color: boxColors[index % boxColors.length],
-                        colorName: boxColorNames[index % boxColors.length]
+                        color: parseInt(colorHex.replace('#', '0x'), 16),
+                        colorName: colorHex
                     });
                 }
             });
